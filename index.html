@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Просмотр логов</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/public/styles.css">
+  <script>
+    // Применяем тему до рендера body, чтобы не было «вспышки» неправильной темы.
+    // Этот блок ДОЛЖЕН оставаться синхронным inline-скриптом — type="module"
+    // имеет defer-семантику и выполнится только после парсинга разметки.
+    (function () {
+      try {
+        var saved = localStorage.getItem('theme');
+        var theme = (saved === 'light' || saved === 'dark') ? saved : 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <span class="title">Просмотр логов</span>
+      <div class="file-input-wrap">
+        <input type="file" id="fileInput" accept=".log,.json,text/*" multiple>
+        <button type="button" class="btn btn-primary">Открыть файл(ы)</button>
+      </div>
+      <button type="button" class="btn btn-success" id="openRemoteBtn">Удаленные файлы</button>
+      <label class="append-mode-check">
+        <input type="checkbox" id="appendMode">
+        <span>Добавить к открытым</span>
+      </label>
+      <button type="button" class="btn" id="clearAllBtn" style="display: none;">Очистить все</button>
+
+      <!-- Live-индикатор -->
+      <div class="live-indicator-wrap">
+        <div class="live-indicator" id="liveIndicator">
+          <span class="live-dot"></span>
+          <span class="live-indicator-text">LIVE</span>
+          <span class="live-count" id="liveCount">0</span>
+          <button class="live-stop-btn" id="stopAllLiveBtn" title="Остановить все live-потоки">Стоп</button>
+        </div>
+        <div class="live-streams-list" id="liveStreamsList"></div>
+      </div>
+
+      <span class="open-files" id="openFilesLabel">Файлы не выбраны</span>
+      <span class="stats" id="stats"></span>
+      <button type="button" class="btn theme-toggle" id="themeToggle" title="Переключить тему" aria-label="Переключить тему">
+        <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+        </svg>
+        <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+    </header>
+
+    <div class="toolbar">
+      <label>
+        Поиск
+        <input type="text" id="search" placeholder="Текст в msg или полях...">
+      </label>
+      <div class="level-filter">
+        <span class="level-filter-label">Уровни</span>
+        <label class="level-check"><input type="checkbox" id="levelError" value="ERROR" checked> ERROR</label>
+        <label class="level-check"><input type="checkbox" id="levelWarn" value="WARN" checked> WARN</label>
+        <label class="level-check"><input type="checkbox" id="levelInfo" value="INFO" checked> INFO</label>
+        <label class="level-check"><input type="checkbox" id="levelDebug" value="DEBUG" checked> DEBUG</label>
+      </div>
+      <label>
+        С
+        <input type="datetime-local" id="timeFrom" step="1">
+      </label>
+      <label>
+        До
+        <input type="datetime-local" id="timeTo" step="1">
+      </label>
+      <label>
+        Сортировка
+        <select id="sortBy">
+          <option value="time-asc">По времени (сначала старые)</option>
+          <option value="time-desc">По времени (сначала новые)</option>
+          <option value="service">По сервису</option>
+          <option value="level">По уровню</option>
+        </select>
+      </label>
+      <div class="toolbar-services-wrap">
+        <span class="services-label">Сервисы:</span>
+        <div class="services-filter" id="servicesFilter"></div>
+      </div>
+    </div>
+
+    <div class="log-list-wrap" id="logListWrap">
+      <div class="live-loading-banner" id="liveLoadingBanner">
+        <div class="live-loading-header">
+          <span class="loading-spinner"></span>
+          <span id="liveLoadingTitle">Подключение к live-потокам...</span>
+        </div>
+        <div class="live-loading-list" id="liveLoadingList"></div>
+        <div class="live-loading-progress"></div>
+      </div>
+      <div class="load-more-wrap" id="loadMoreWrap">
+        <button class="load-more-btn" id="loadMoreBtn">
+          <span>↑ Загрузить ещё (более старые) ↑</span>
+          <span class="load-more-info" id="loadMoreInfo"></span>
+        </button>
+      </div>
+      <div class="log-list" id="logList">
+        <div class="empty-state" id="emptyState">
+          <p>Выберите один или несколько лог-файлов (JSON Lines).</p>
+          <p>Логи из разных файлов будут объединены и отсортированы по времени.</p>
+          <p style="margin-top: 16px;">Или нажмите <strong>"Удаленные файлы"</strong> для загрузки с серверов.</p>
+        </div>
+        <div class="empty-state" id="noResultsState" style="display: none;">
+          <p>Нет записей по заданным фильтрам.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно удаленных файлов -->
+  <div class="modal-overlay" id="remoteModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Удаленные файлы</span>
+        <button class="modal-close" id="closeModal">&times;</button>
+      </div>
+      <div class="modal-body" id="remoteModalBody">
+        <!-- Содержимое загружается динамически -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="cancelRemote">Отмена</button>
+        <button class="btn btn-primary" id="loadRemoteBtn" disabled>Загрузить выбранные</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Точка входа: остальные модули подгружаются через import. -->
+  <script type="module" src="/public/app.js"></script>
+</body>
+</html>

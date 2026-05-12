@@ -1,0 +1,79 @@
+{
+  "servers": [
+    {
+      "id": "s1",
+      "name": "Stage Server",
+      "host": "192.168.185.111",
+      "port": 22,
+      "username": "user",
+      "password": "P@ssw0rd",
+      "files": [
+        {
+          "id": "s1f1",
+          "name": "Assistant Service Log",
+          "remotePath": "/var/www/services/assistant-service/assistant-service.log"
+        },
+        {
+          "id": "s1f2",
+          "name": "Broker Service Log",
+          "remotePath": "/var/www/services/broker-service/broker-service.log"
+        },
+        {
+          "id": "s1f3",
+          "name": "FullTextSearch Service Log",
+          "remotePath": "/var/www/services/fulltextsearch-service/fulltextsearch-service.log"
+        },
+        {
+          "id": "s1f4",
+          "name": "Geocoder Service Log",
+          "remotePath": "/var/www/services/geocoder-service/geocoder-service.log"
+        },
+        {
+          "id": "s1f5",
+          "name": "Graph Service Log",
+          "remotePath": "/var/www/services/graph-service/graph-service.log"
+        },
+        {
+          "id": "s1f6",
+          "name": "Ontology Service Log",
+          "remotePath": "/var/www/services/ontology-service/ontology-service.log"
+        },
+        {
+          "id": "s1f7",
+          "name": "Processing Service Log",
+          "remotePath": "/var/www/services/processing-service/processing-service.log"
+        },
+        {
+          "id": "s1f8",
+          "name": "Project Service Log",
+          "remotePath": "/var/www/services/project-service/project-service.log"
+        },
+        {
+          "id": "s1f9",
+          "name": "Report Service Log",
+          "remotePath": "/var/www/services/report-service/report-service.log"
+        },
+        {
+          "id": "s1f10",
+          "name": "User Service Log",
+          "remotePath": "/var/www/services/user-service/user-service.log"
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "name": "Production Server",
+      "host": "192.168.185.8",
+      "port": 22,
+      "username": "user",
+      "password": "P@ssw0rd",
+      "files": [
+        {
+          "id": "s2f1",
+          "name": "Order Service Log",
+          "remotePath": "/var/www/services/order-service/order-service.log"
+        }
+      ]
+    }
+  ]
+}
