@@ -6,7 +6,7 @@
 //  • навешивание глобальных обработчиков индикатора LIVE.
 
 import { state, dom } from './state.js';
-import { parseLogLine } from './utils.js';
+import { parseLogLine, getQuickRange, msToDatetimeLocalValue } from './utils.js';
 import {
   render,
   updateUI,
@@ -91,6 +91,33 @@ dom.clearAllBtn.addEventListener('click', () => {
   el.addEventListener('change', render);
 });
 dom.levelChecks.forEach(cb => cb.addEventListener('change', render));
+
+// Быстрые временные диапазоны: один клик заполняет timeFrom/timeTo
+// относительно текущего момента и перерисовывает список.
+dom.quickRangeButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const preset = btn.dataset.range;
+    if (preset === 'clear') {
+      dom.timeFrom.value = '';
+      dom.timeTo.value = '';
+      dom.quickRangeButtons.forEach(b => b.classList.remove('active'));
+    } else {
+      const { fromMs, toMs } = getQuickRange(preset, Date.now());
+      dom.timeFrom.value = msToDatetimeLocalValue(fromMs);
+      dom.timeTo.value   = msToDatetimeLocalValue(toMs);
+      dom.quickRangeButtons.forEach(b => b.classList.toggle('active', b === btn));
+    }
+    // Программная установка .value НЕ триггерит 'input'/'change' — рендерим вручную.
+    render();
+  });
+});
+
+// Если пользователь правит даты руками — снимаем подсветку выбранного пресета.
+[dom.timeFrom, dom.timeTo].forEach(el => {
+  el.addEventListener('input', () => {
+    dom.quickRangeButtons.forEach(b => b.classList.remove('active'));
+  });
+});
 
 // ====================== Модалка ======================
 

@@ -167,3 +167,69 @@ export function sortLogs(logs, sortMode) {
   }
   return list;
 }
+
+/**
+ * Возвращает { fromMs, toMs } для пресета быстрого диапазона относительно
+ * момента `nowMs`. Чистая функция — без DOM и без Date.now() внутри, чтобы
+ * её можно было детерминированно тестировать.
+ *
+ * Поддерживаемые пресеты:
+ *   '5m', '15m', '1h', '6h', '24h', '7d'  — последние N от now
+ *   'today'      — от полуночи сегодня (локально) до now
+ *   'yesterday'  — от полуночи вчера до полуночи сегодня (локально)
+ *
+ * Неизвестный пресет → { fromMs: null, toMs: null }.
+ *
+ * @param {string} preset
+ * @param {number} [nowMs] — текущий момент в мс. Если опущен, берётся Date.now().
+ * @returns {{fromMs: ?number, toMs: ?number}}
+ */
+export function getQuickRange(preset, nowMs) {
+  const now = nowMs == null ? Date.now() : nowMs;
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  switch (preset) {
+    case '5m':  return { fromMs: now - 5 * minute,  toMs: now };
+    case '15m': return { fromMs: now - 15 * minute, toMs: now };
+    case '1h':  return { fromMs: now - hour,        toMs: now };
+    case '6h':  return { fromMs: now - 6 * hour,    toMs: now };
+    case '24h': return { fromMs: now - day,         toMs: now };
+    case '7d':  return { fromMs: now - 7 * day,     toMs: now };
+    case 'today': {
+      const midnight = new Date(now);
+      midnight.setHours(0, 0, 0, 0);
+      return { fromMs: midnight.getTime(), toMs: now };
+    }
+    case 'yesterday': {
+      const todayMidnight = new Date(now);
+      todayMidnight.setHours(0, 0, 0, 0);
+      const yesterdayMidnight = new Date(todayMidnight);
+      yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
+      return { fromMs: yesterdayMidnight.getTime(), toMs: todayMidnight.getTime() };
+    }
+    default:
+      return { fromMs: null, toMs: null };
+  }
+}
+
+/**
+ * Форматирует unix-миллисекунды в строку формата YYYY-MM-DDTHH:MM:SS
+ * в ЛОКАЛЬНОМ часовом поясе — именно такой формат принимает
+ * <input type="datetime-local" step="1"> для записи в .value.
+ *
+ * Date#toISOString() не подходит: он возвращает UTC, из-за чего в полях
+ * фильтра пользователь увидел бы смещённое время.
+ *
+ * Возвращает '' для null/undefined/NaN.
+ *
+ * @param {?number} ms
+ * @returns {string}
+ */
+export function msToDatetimeLocalValue(ms) {
+  if (ms == null || !Number.isFinite(ms)) return '';
+  const d = new Date(ms);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+         `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}

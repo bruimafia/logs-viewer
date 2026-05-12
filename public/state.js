@@ -49,6 +49,7 @@ export const dom = {
   levelChecks: ['levelError', 'levelWarn', 'levelInfo', 'levelDebug'].map(id => document.getElementById(id)),
   timeFrom: document.getElementById('timeFrom'),
   timeTo: document.getElementById('timeTo'),
+  quickRangeButtons: document.querySelectorAll('.quick-range-btn'),
   sortBy: document.getElementById('sortBy'),
   servicesFilter: document.getElementById('servicesFilter'),
   appendModeCheckbox: document.getElementById('appendMode'),

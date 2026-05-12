@@ -82,6 +82,18 @@
         До
         <input type="datetime-local" id="timeTo" step="1">
       </label>
+      <div class="quick-ranges" id="quickRanges" role="group" aria-label="Быстрые временные диапазоны">
+        <span class="quick-ranges-label">Быстро:</span>
+        <button type="button" class="quick-range-btn" data-range="5m">5 мин</button>
+        <button type="button" class="quick-range-btn" data-range="15m">15 мин</button>
+        <button type="button" class="quick-range-btn" data-range="1h">1 ч</button>
+        <button type="button" class="quick-range-btn" data-range="6h">6 ч</button>
+        <button type="button" class="quick-range-btn" data-range="24h">24 ч</button>
+        <button type="button" class="quick-range-btn" data-range="7d">7 дн</button>
+        <button type="button" class="quick-range-btn" data-range="today">Сегодня</button>
+        <button type="button" class="quick-range-btn" data-range="yesterday">Вчера</button>
+        <button type="button" class="quick-range-btn quick-range-clear" data-range="clear" title="Очистить диапазон" aria-label="Очистить диапазон">×</button>
+      </div>
       <label>
         Сортировка
         <select id="sortBy">

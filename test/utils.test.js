@@ -10,7 +10,9 @@ import {
   sortLogs,
   formatBytes,
   escapeHtml,
-  highlightMatch
+  highlightMatch,
+  getQuickRange,
+  msToDatetimeLocalValue
 } from '../public/utils.js';
 
 // ====================== parseLogLine ======================
@@ -317,4 +319,87 @@ test('highlightMatch: непересекающиеся совпадения, ш�
 
 test('highlightMatch: query длиннее текста — совпадений нет', () => {
   assert.equal(highlightMatch('hi', 'hello'), 'hi');
+});
+
+// ====================== getQuickRange ======================
+
+test('getQuickRange: 5m — fromMs = now - 5 минут, toMs = now', () => {
+  const now = 1_700_000_000_000;
+  const r = getQuickRange('5m', now);
+  assert.equal(r.toMs, now);
+  assert.equal(r.fromMs, now - 5 * 60_000);
+});
+
+test('getQuickRange: 15m / 1h / 6h / 24h / 7d — корректные смещения', () => {
+  const now = 1_700_000_000_000;
+  assert.equal(getQuickRange('15m', now).fromMs, now - 15 * 60_000);
+  assert.equal(getQuickRange('1h',  now).fromMs, now - 60 * 60_000);
+  assert.equal(getQuickRange('6h',  now).fromMs, now - 6 * 60 * 60_000);
+  assert.equal(getQuickRange('24h', now).fromMs, now - 24 * 60 * 60_000);
+  assert.equal(getQuickRange('7d',  now).fromMs, now - 7 * 24 * 60 * 60_000);
+  for (const p of ['15m', '1h', '6h', '24h', '7d']) {
+    assert.equal(getQuickRange(p, now).toMs, now);
+  }
+});
+
+test('getQuickRange: today — fromMs = локальная полночь, toMs = now', () => {
+  const now = Date.now();
+  const r = getQuickRange('today', now);
+  const expected = new Date(now);
+  expected.setHours(0, 0, 0, 0);
+  assert.equal(r.fromMs, expected.getTime());
+  assert.equal(r.toMs, now);
+  assert.ok(r.fromMs <= r.toMs);
+});
+
+test('getQuickRange: yesterday — диапазон от полуночи вчера до полуночи сегодня', () => {
+  const now = Date.now();
+  const r = getQuickRange('yesterday', now);
+  const todayMidnight = new Date(now);
+  todayMidnight.setHours(0, 0, 0, 0);
+  const yesterdayMidnight = new Date(todayMidnight);
+  yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
+  assert.equal(r.fromMs, yesterdayMidnight.getTime());
+  assert.equal(r.toMs,   todayMidnight.getTime());
+  // На границе DST разница может быть 23 или 25 часов — допускаем
+  const diffHours = (r.toMs - r.fromMs) / 3_600_000;
+  assert.ok(diffHours >= 23 && diffHours <= 25, `ожидали ~24ч, получили ${diffHours}`);
+});
+
+test('getQuickRange: неизвестный пресет → { fromMs: null, toMs: null }', () => {
+  const r = getQuickRange('xxx', Date.now());
+  assert.equal(r.fromMs, null);
+  assert.equal(r.toMs, null);
+});
+
+test('getQuickRange: без nowMs использует Date.now()', () => {
+  const before = Date.now();
+  const r = getQuickRange('1h');
+  const after = Date.now();
+  assert.ok(r.toMs >= before && r.toMs <= after);
+  assert.equal(r.toMs - r.fromMs, 60 * 60_000);
+});
+
+// ====================== msToDatetimeLocalValue ======================
+
+test('msToDatetimeLocalValue: форматирует мс в YYYY-MM-DDTHH:MM:SS (локально)', () => {
+  const d = new Date(2024, 0, 15, 10, 30, 45);
+  assert.equal(msToDatetimeLocalValue(d.getTime()), '2024-01-15T10:30:45');
+});
+
+test('msToDatetimeLocalValue: одноцифровые компоненты заполняются нулями', () => {
+  const d = new Date(2024, 4, 3, 7, 5, 9);
+  assert.equal(msToDatetimeLocalValue(d.getTime()), '2024-05-03T07:05:09');
+});
+
+test('msToDatetimeLocalValue: null/undefined/NaN → ""', () => {
+  assert.equal(msToDatetimeLocalValue(null), '');
+  assert.equal(msToDatetimeLocalValue(undefined), '');
+  assert.equal(msToDatetimeLocalValue(NaN), '');
+});
+
+test('msToDatetimeLocalValue: round-trip через datetime-local', () => {
+  const original = '2024-07-08T13:45:22';
+  const ms = new Date(original).getTime();
+  assert.equal(msToDatetimeLocalValue(ms), original);
 });
