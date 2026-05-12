@@ -9,7 +9,8 @@ import {
   applyFilters,
   sortLogs,
   formatBytes,
-  escapeHtml
+  escapeHtml,
+  highlightMatch
 } from '../public/utils.js';
 
 // ====================== parseLogLine ======================
@@ -237,4 +238,83 @@ test('escapeHtml (Node-ветка): экранирует основные спе
 test('escapeHtml: null/undefined → пустая строка', () => {
   assert.equal(escapeHtml(null), '');
   assert.equal(escapeHtml(undefined), '');
+});
+
+// ====================== highlightMatch ======================
+
+test('highlightMatch: пустой query — возвращает экранированный текст без mark', () => {
+  assert.equal(highlightMatch('hello <b>', ''), 'hello &lt;b&gt;');
+  assert.equal(highlightMatch('hello <b>', null), 'hello &lt;b&gt;');
+  assert.equal(highlightMatch('hello <b>', undefined), 'hello &lt;b&gt;');
+});
+
+test('highlightMatch: null/undefined text — пустая строка', () => {
+  assert.equal(highlightMatch(null, 'x'), '');
+  assert.equal(highlightMatch(undefined, 'x'), '');
+});
+
+test('highlightMatch: пустой text', () => {
+  assert.equal(highlightMatch('', 'abc'), '');
+});
+
+test('highlightMatch: простое совпадение оборачивается в <mark>', () => {
+  assert.equal(
+    highlightMatch('hello world', 'world'),
+    'hello <mark class="search-match">world</mark>'
+  );
+});
+
+test('highlightMatch: совпадение в начале строки', () => {
+  assert.equal(
+    highlightMatch('world hello', 'world'),
+    '<mark class="search-match">world</mark> hello'
+  );
+});
+
+test('highlightMatch: регистронезависимое, регистр исходного текста сохраняется', () => {
+  assert.equal(
+    highlightMatch('Hello WORLD', 'world'),
+    'Hello <mark class="search-match">WORLD</mark>'
+  );
+});
+
+test('highlightMatch: несколько совпадений подсвечиваются все', () => {
+  assert.equal(
+    highlightMatch('foo bar foo', 'foo'),
+    '<mark class="search-match">foo</mark> bar <mark class="search-match">foo</mark>'
+  );
+});
+
+test('highlightMatch: HTML экранируется и снаружи, и внутри mark', () => {
+  assert.equal(
+    highlightMatch('<script>alert(x)</script>', 'alert'),
+    '&lt;script&gt;<mark class="search-match">alert</mark>(x)&lt;/script&gt;'
+  );
+});
+
+test('highlightMatch: спецсимволы regex в query трактуются как литералы', () => {
+  // Точка не должна совпадать с «X» (как было бы при некорректном использовании RegExp).
+  assert.equal(
+    highlightMatch('aXb a.b', '.'),
+    'aXb a<mark class="search-match">.</mark>b'
+  );
+});
+
+test('highlightMatch: совпадений нет — возвращает только escapeHtml(text)', () => {
+  assert.equal(
+    highlightMatch('hello <world>', 'xyz'),
+    'hello &lt;world&gt;'
+  );
+});
+
+test('highlightMatch: непересекающиеся совпадения, шаг = длине иголки', () => {
+  // "aaaa" с поиском "aa" → ровно два совпадения, не четыре
+  assert.equal(
+    highlightMatch('aaaa', 'aa'),
+    '<mark class="search-match">aa</mark><mark class="search-match">aa</mark>'
+  );
+});
+
+test('highlightMatch: query длиннее текста — совпадений нет', () => {
+  assert.equal(highlightMatch('hi', 'hello'), 'hi');
 });

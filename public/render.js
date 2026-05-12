@@ -2,7 +2,7 @@
 // Зависит от state (state.allLogs, state.fileNames, …) и DOM (dom.*).
 
 import { state, dom, LIVE_BUFFER_CAP, LIVE_RENDER_DEBOUNCE_MS } from './state.js';
-import { escapeHtml, formatTime, parseLogLine, applyFilters, sortLogs } from './utils.js';
+import { escapeHtml, highlightMatch, formatTime, parseLogLine, applyFilters, sortLogs } from './utils.js';
 
 // ====================== Чипы сервисов ======================
 
@@ -150,6 +150,9 @@ function isNearTop() {
 export function render() {
   // Пересобираем чипы сервисов, если множество изменилось (важно для live-режима).
   maybeRebuildChips();
+  // Считываем поисковую строку один раз — она используется и в фильтре,
+  // и для подсветки совпадений в результатах.
+  const search = dom.searchInput.value.trim();
   const list = filterLogs();
   dom.statsEl.textContent = list.length === state.allLogs.length
     ? `Записей: ${state.allLogs.length}`
@@ -191,12 +194,12 @@ export function render() {
       <span class="log-time">${formatTime(entry._timeMs)}</span>
       <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
       <span class="log-service">${escapeHtml(entry._serviceKey || '')}</span>
-      <span class="log-msg">${escapeHtml(entry.msg || '')}</span>
+      <span class="log-msg">${highlightMatch(entry.msg || '', search)}</span>
       ${extraKeys.length ? `
         <div class="log-extra">
           <details>
             <summary>Доп. поля (${extraKeys.length})</summary>
-            <pre>${escapeHtml(JSON.stringify(extra, null, 2))}</pre>
+            <pre>${highlightMatch(JSON.stringify(extra, null, 2), search)}</pre>
           </details>
         </div>
       ` : ''}

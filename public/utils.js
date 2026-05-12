@@ -22,6 +22,45 @@ export function escapeHtml(s) {
 }
 
 /**
+ * Возвращает HTML-строку, в которой все вхождения подстроки `query`
+ * в `text` (без учёта регистра) обёрнуты в `<mark class="search-match">`.
+ *
+ * И «фоновый» текст, и сами совпадения экранируются через escapeHtml,
+ * поэтому результат безопасен для вставки через innerHTML.
+ *
+ * Совпадения не пересекаются: после каждого матча курсор сдвигается
+ * на длину иголки. При пустом `query` или пустой иголке функция
+ * вырождается в обычный escapeHtml.
+ *
+ * @param {string} text
+ * @param {string} query
+ * @returns {string}
+ */
+export function highlightMatch(text, query) {
+  const str = text == null ? '' : String(text);
+  if (!query) return escapeHtml(str);
+  const needle = String(query).toLowerCase();
+  if (!needle) return escapeHtml(str);
+
+  const haystack = str.toLowerCase();
+  const parts = [];
+  let i = 0;
+  while (i <= str.length) {
+    const idx = haystack.indexOf(needle, i);
+    if (idx === -1) {
+      parts.push(escapeHtml(str.slice(i)));
+      break;
+    }
+    if (idx > i) parts.push(escapeHtml(str.slice(i, idx)));
+    parts.push(
+      `<mark class="search-match">${escapeHtml(str.slice(idx, idx + needle.length))}</mark>`
+    );
+    i = idx + needle.length;
+  }
+  return parts.join('');
+}
+
+/**
  * Форматирует unix-миллисекунды в локализованную строку даты-времени.
  * В тестах вызывается с известным TZ, поэтому возвращаемый формат стабилен.
  */

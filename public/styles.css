@@ -36,6 +36,8 @@
   --modal-shadow: 0 8px 24px rgba(0,0,0,0.5);
   --modal-shadow-strong: 0 20px 60px rgba(0,0,0,0.5);
   --modal-overlay: rgba(0,0,0,0.7);
+  --match-bg: #f1e05a;        /* насыщенный жёлтый, читается на тёмном фоне */
+  --match-fg: #0f1117;        /* почти чёрный текст внутри подсветки */
 }
 
 :root[data-theme="light"] {
@@ -71,6 +73,8 @@
   --modal-shadow: 0 8px 24px rgba(31,35,40,0.15);
   --modal-shadow-strong: 0 20px 60px rgba(31,35,40,0.2);
   --modal-overlay: rgba(31,35,40,0.4);
+  --match-bg: #fff8c5;        /* мягкий жёлтый в духе GitHub */
+  --match-fg: #1f2328;        /* тёмный текст */
 }
 
 * { box-sizing: border-box; }
@@ -402,6 +406,13 @@ header {
   white-space: nowrap;
 }
 .log-msg { color: var(--text); }
+mark.search-match {
+  background: var(--match-bg);
+  color: var(--match-fg);
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 500;
+}
 .log-extra {
   grid-column: 1 / -1;
   margin-top: 4px;
@@ -412,6 +423,9 @@ header {
 }
 .log-extra summary { cursor: pointer; }
 .log-extra pre { margin: 4px 0 0; overflow-x: auto; }
+.log-extra pre mark.search-match {
+  color: var(--match-fg);
+}
 
 .empty-state {
   text-align: center;
