@@ -81,7 +81,7 @@ export const dom = {
   // Баннер активного фильтра по traceId
   traceFilterBanner: document.getElementById('traceFilterBanner'),
   traceFilterValue: document.getElementById('traceFilterValue'),
-  traceFilterClear: document.getElementById('traceFilterClear')
+  traceFilterClear: document.getElementById('traceFilterClear'),
 
   // Контейнер toast-уведомлений (пункт 6.1)
   toastContainer: document.getElementById('toastContainer')
