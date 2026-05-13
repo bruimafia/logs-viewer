@@ -2,7 +2,16 @@
 // Зависит от state (state.allLogs, state.fileNames, …) и DOM (dom.*).
 
 import { state, dom, LIVE_BUFFER_CAP, LIVE_RENDER_DEBOUNCE_MS } from './state.js';
-import { escapeHtml, highlightMatch, formatTime, parseLogLine, applyFilters, sortLogs } from './utils.js';
+import {
+  escapeHtml,
+  highlightMatch,
+  formatTime,
+  parseLogLine,
+  applyFilters,
+  sortLogs,
+  traceIdColor,
+  shortTraceId
+} from './utils.js';
 
 // ====================== Чипы сервисов ======================
 
@@ -86,6 +95,33 @@ export function updateLiveIndicator() {
   }
 }
 
+// ====================== Баннер активной trace-трассы ======================
+
+/**
+ * Устанавливает активный фильтр по traceId. Передача '' / null снимает фильтр.
+ * Вызывается изнутри (клик по бейджу) и из app.js (Clear-кнопка, очистка
+ * при загрузке новых файлов).
+ */
+export function setTraceFilter(traceId) {
+  state.currentTraceFilter = traceId || null;
+  render();
+}
+
+function updateTraceFilterBanner() {
+  const tf = state.currentTraceFilter;
+  if (!dom.traceFilterBanner) return;
+  if (tf) {
+    dom.traceFilterBanner.style.display = '';
+    if (dom.traceFilterValue) {
+      dom.traceFilterValue.textContent = tf;
+      dom.traceFilterValue.style.color = traceIdColor(tf);
+      dom.traceFilterValue.title = tf;
+    }
+  } else {
+    dom.traceFilterBanner.style.display = 'none';
+  }
+}
+
 export function updateUI() {
   buildServiceChips();
   updateOpenFilesLabel();
@@ -135,7 +171,8 @@ function filterLogs() {
     activeLevels: dom.levelChecks.filter(cb => cb.checked).map(cb => cb.value),
     fromMs: dom.timeFrom.value ? new Date(dom.timeFrom.value).getTime() : null,
     toMs: dom.timeTo.value ? new Date(dom.timeTo.value).getTime() : null,
-    serviceVisibility: state.serviceVisibility
+    serviceVisibility: state.serviceVisibility,
+    traceFilter: state.currentTraceFilter || null
   };
   return sortLogs(applyFilters(state.allLogs, filters), dom.sortBy.value);
 }
@@ -150,13 +187,20 @@ function isNearTop() {
 export function render() {
   // Пересобираем чипы сервисов, если множество изменилось (важно для live-режима).
   maybeRebuildChips();
+  // Обновляем баннер активной трассы.
+  updateTraceFilterBanner();
   // Считываем поисковую строку один раз — она используется и в фильтре,
   // и для подсветки совпадений в результатах.
   const search = dom.searchInput.value.trim();
   const list = filterLogs();
-  dom.statsEl.textContent = list.length === state.allLogs.length
-    ? `Записей: ${state.allLogs.length}`
-    : `Показано: ${list.length} из ${state.allLogs.length}`;
+  const trace = state.currentTraceFilter;
+  if (trace) {
+    dom.statsEl.textContent = `Трасса ${shortTraceId(trace)}: ${list.length} из ${state.allLogs.length}`;
+  } else {
+    dom.statsEl.textContent = list.length === state.allLogs.length
+      ? `Записей: ${state.allLogs.length}`
+      : `Показано: ${list.length} из ${state.allLogs.length}`;
+  }
 
   if (!state.allLogs.length) {
     dom.emptyState.style.display = 'block';
@@ -179,22 +223,41 @@ export function render() {
   list.forEach(entry => {
     const row = document.createElement('div');
     row.className = `log-entry level-${(entry.level || 'INFO').toUpperCase()}`;
+    if (entry._traceId) row.dataset.trace = entry._traceId;
+
     const extra = { ...entry };
     delete extra._timeMs;
     delete extra._sourceName;
     delete extra._serviceKey;
     delete extra._fileName;
+    delete extra._traceId;
     delete extra.time;
     delete extra.level;
     delete extra.msg;
     delete extra.service;
     delete extra.source;
     const extraKeys = Object.keys(extra).filter(k => extra[k] !== undefined && extra[k] !== '');
+
+    // Бейдж traceId: кликабельный, окрашен стабильным цветом по хэшу.
+    // Если уже идёт фильтрация по этой же трассе — у бейджа класс .active.
+    let traceBadgeHtml = '';
+    if (entry._traceId) {
+      const tid = entry._traceId;
+      const color = traceIdColor(tid);
+      const short = shortTraceId(tid);
+      const isActive = state.currentTraceFilter === tid;
+      traceBadgeHtml = `<button type="button" class="log-trace-badge${isActive ? ' active' : ''}" ` +
+        `data-trace="${escapeHtml(tid)}" ` +
+        `style="--trace-color:${color}" ` +
+        `title="${isActive ? 'Снять фильтр по трассе' : 'Показать только эту трассу'}: ${escapeHtml(tid)}">` +
+        `${escapeHtml(short)}</button> `;
+    }
+
     row.innerHTML = `
       <span class="log-time">${formatTime(entry._timeMs)}</span>
       <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
       <span class="log-service">${escapeHtml(entry._serviceKey || '')}</span>
-      <span class="log-msg">${highlightMatch(entry.msg || '', search)}</span>
+      <span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>
       ${extraKeys.length ? `
         <div class="log-extra">
           <details>
@@ -213,7 +276,7 @@ export function render() {
   // Авто-скролл в live-режиме
   if (state.liveStreams.size > 0 && !state.userScrolledAway) {
     const sort = dom.sortBy.value;
-    const newestAtBottom = (sort === 'time-asc' || sort === 'service' || sort === 'level');
+    const newestAtBottom = (sort === 'time-asc' || sort === 'service' || sort === 'level' || sort === 'trace');
     if (newestAtBottom && wasNearBottom) {
       dom.logListWrap.scrollTop = dom.logListWrap.scrollHeight;
     } else if (!newestAtBottom && wasNearTop) {
@@ -236,7 +299,29 @@ export function attachScrollHandler() {
     // Любая ручная прокрутка отключает авто-скролл, пока пользователь не вернётся к краю.
     if (state.liveStreams.size === 0) return;
     const sort = dom.sortBy.value;
-    const newestAtBottom = (sort === 'time-asc' || sort === 'service' || sort === 'level');
+    const newestAtBottom = (sort === 'time-asc' || sort === 'service' || sort === 'level' || sort === 'trace');
     state.userScrolledAway = newestAtBottom ? !isNearBottom() : !isNearTop();
   });
+}
+
+// Делегирование клика по бейджу traceId. Список перерисовывается часто
+// (live-режим), поэтому удобнее повесить один обработчик на контейнер.
+export function attachTraceBadgeHandler() {
+  dom.logList.addEventListener('click', (e) => {
+    const badge = e.target.closest && e.target.closest('.log-trace-badge');
+    if (!badge) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const trace = badge.dataset.trace || '';
+    // Повторный клик по уже активной трассе — снимает фильтр.
+    if (state.currentTraceFilter === trace) {
+      setTraceFilter(null);
+    } else {
+      setTraceFilter(trace);
+    }
+  });
+
+  if (dom.traceFilterClear) {
+    dom.traceFilterClear.addEventListener('click', () => setTraceFilter(null));
+  }
 }

@@ -10,7 +10,9 @@ import { parseLogLine, getQuickRange, msToDatetimeLocalValue } from './utils.js'
 import {
   render,
   updateUI,
-  attachScrollHandler
+  attachScrollHandler,
+  attachTraceBadgeHandler,
+  setTraceFilter
 } from './render.js';
 import {
   stopAllLive,
@@ -34,6 +36,9 @@ async function loadFiles(files) {
     state.serviceVisibility = {};
     state.openedFiles = [];
     state.paginatedFiles.clear();
+    // При полной перезагрузке снимаем активный фильтр по трассе —
+    // он почти наверняка относится к старому набору данных.
+    state.currentTraceFilter = null;
   }
 
   for (const file of files) {
@@ -82,6 +87,7 @@ dom.clearAllBtn.addEventListener('click', () => {
   state.serviceVisibility = {};
   state.openedFiles = [];
   state.paginatedFiles.clear();
+  state.currentTraceFilter = null;
   updateUI();
 });
 
@@ -152,6 +158,8 @@ document.addEventListener('click', (e) => {
 });
 
 attachScrollHandler();
+// Делегирование клика по бейджам traceId + клик по «✕» в баннере фильтра.
+attachTraceBadgeHandler();
 
 // ====================== Переключение темы ======================
 

@@ -32,7 +32,13 @@ export const state = {
   // Флаг — пользователь прокрутил список и не хочет авто-скролла
   userScrolledAway: false,
   // Хэш текущего набора сервисов — чтобы не пересобирать чипы лишний раз
-  lastChipServicesKey: ''
+  lastChipServicesKey: '',
+
+  // Активный фильтр по traceId / requestId.
+  // null или пустая строка — фильтр выключен. Строка — показываем только записи
+  // с e._traceId === currentTraceFilter. Устанавливается кликом по бейджу
+  // трассы в любой записи, снимается крестиком в баннере или при «Очистить все».
+  currentTraceFilter: null
 };
 
 // DOM-ссылки. Модуль грузится через <script type="module">, который
@@ -70,5 +76,10 @@ export const dom = {
   liveLoadingBanner: document.getElementById('liveLoadingBanner'),
   liveLoadingList: document.getElementById('liveLoadingList'),
   liveLoadingTitle: document.getElementById('liveLoadingTitle'),
-  themeToggleBtn: document.getElementById('themeToggle')
+  themeToggleBtn: document.getElementById('themeToggle'),
+
+  // Баннер активного фильтра по traceId
+  traceFilterBanner: document.getElementById('traceFilterBanner'),
+  traceFilterValue: document.getElementById('traceFilterValue'),
+  traceFilterClear: document.getElementById('traceFilterClear')
 };

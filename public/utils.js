@@ -3,6 +3,21 @@
 // проверять логику парсинга/фильтрации/сортировки без браузера.
 
 /**
+ * Имена JSON-полей, в которых ищем идентификатор трассы / запроса.
+ * Порядок имеет значение — первое непустое значение побеждает.
+ * Покрывает наиболее частые конвенции: camelCase, snake_case,
+ * trace / request / correlation.
+ */
+export const DEFAULT_TRACE_FIELDS = [
+  'traceId',
+  'trace_id',
+  'requestId',
+  'request_id',
+  'correlationId',
+  'correlation_id'
+];
+
+/**
  * Экранирует строку для безопасной вставки в HTML.
  * В браузере — через textContent/innerHTML; в Node возвращаем сырую строку
  * (тесты эту функцию не трогают, но импорт модуля не должен падать).
@@ -61,6 +76,71 @@ export function highlightMatch(text, query) {
 }
 
 /**
+ * Возвращает идентификатор трассы из JSON-объекта лог-записи или пустую
+ * строку, если ни одного из распознаваемых полей нет. Чистая функция,
+ * без DOM, без зависимостей.
+ *
+ * Логика:
+ *  - перебираем `fields` в порядке передачи (по умолчанию — `DEFAULT_TRACE_FIELDS`);
+ *  - берём первое значение, которое не `null`/`undefined` и не пустая строка;
+ *  - числовые значения преобразуются в строку (некоторые трейсеры пишут int64).
+ *
+ * Не считается trace-полем: массив, объект, булево значение `false`.
+ *
+ * @param {Object} obj
+ * @param {string[]} [fields=DEFAULT_TRACE_FIELDS]
+ * @returns {string}
+ */
+export function getTraceId(obj, fields = DEFAULT_TRACE_FIELDS) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return '';
+  for (const f of fields) {
+    const v = obj[f];
+    if (v == null) continue;
+    if (typeof v === 'string') {
+      if (v) return v;
+    } else if (typeof v === 'number') {
+      // Не пропускаем 0, но и не делаем String(NaN)
+      if (Number.isFinite(v)) return String(v);
+    }
+    // Объекты/массивы/булевы значения пропускаем — это явно не трейс.
+  }
+  return '';
+}
+
+/**
+ * Возвращает стабильный CSS-цвет (HSL) по строке traceId.
+ * Один и тот же traceId всегда даёт один и тот же цвет —
+ * это позволяет визуально связать записи одной трассы.
+ *
+ * Лёгкая 32-битная хэш-функция, тестируемо в Node.
+ *
+ * @param {string} traceId
+ * @returns {string} например, 'hsl(217, 60%, 55%)'
+ */
+export function traceIdColor(traceId) {
+  const s = String(traceId || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  }
+  const hue = ((h % 360) + 360) % 360;
+  return `hsl(${hue}, 60%, 55%)`;
+}
+
+/**
+ * Сокращает длинный traceId до короткого представления для бейджа.
+ * UUID/sha-id обычно длинные — показываем первые 8 символов + …
+ *
+ * @param {string} traceId
+ * @returns {string}
+ */
+export function shortTraceId(traceId) {
+  const s = String(traceId || '');
+  if (s.length <= 10) return s;
+  return s.slice(0, 8) + '…';
+}
+
+/**
  * Форматирует unix-миллисекунды в локализованную строку даты-времени.
  * В тестах вызывается с известным TZ, поэтому возвращаемый формат стабилен.
  */
@@ -90,6 +170,7 @@ export function formatBytes(bytes) {
  *   _timeMs      — миллисекунды (для сортировки/фильтра)
  *   _sourceName  — имя источника без расширения
  *   _serviceKey  — service из JSON или sourceName
+ *   _traceId     — извлечённый traceId/requestId/correlationId (или '')
  */
 export function parseLogLine(line, sourceName) {
   if (line == null) return null;
@@ -104,7 +185,8 @@ export function parseLogLine(line, sourceName) {
       ...o,
       _timeMs: Number.isNaN(time) ? 0 : time,
       _sourceName: sourceName,
-      _serviceKey: service
+      _serviceKey: service,
+      _traceId: getTraceId(o)
     };
   } catch (_) {
     return null;
@@ -112,8 +194,8 @@ export function parseLogLine(line, sourceName) {
 }
 
 /**
- * Применяет фильтры (поиск, уровни, временной диапазон, видимость сервисов)
- * к массиву логов. Не модифицирует исходный массив.
+ * Применяет фильтры (поиск, уровни, временной диапазон, видимость сервисов,
+ * активный traceId) к массиву логов. Не модифицирует исходный массив.
  *
  * @param {Array} logs            — исходные логи
  * @param {Object} filters
@@ -122,9 +204,10 @@ export function parseLogLine(line, sourceName) {
  * @param {?number} filters.fromMs         — нижняя граница времени (null = без)
  * @param {?number} filters.toMs           — верхняя граница времени (null = без)
  * @param {Object} filters.serviceVisibility — serviceKey → bool
+ * @param {?string} filters.traceFilter    — если задан, оставляем только записи с этим _traceId
  */
 export function applyFilters(logs, filters) {
-  const { search, activeLevels, fromMs, toMs, serviceVisibility } = filters;
+  const { search, activeLevels, fromMs, toMs, serviceVisibility, traceFilter } = filters;
   let list = logs;
 
   if (search) {
@@ -143,6 +226,9 @@ export function applyFilters(logs, filters) {
   if (serviceVisibility) {
     list = list.filter(e => serviceVisibility[e._serviceKey] !== false);
   }
+  if (traceFilter) {
+    list = list.filter(e => e._traceId === traceFilter);
+  }
   return list;
 }
 
@@ -150,8 +236,14 @@ export function applyFilters(logs, filters) {
  * Возвращает новый массив, отсортированный по выбранному режиму.
  * Не модифицирует исходный.
  *
+ * Режим `'trace'`: записи с одним и тем же `_traceId` идут подряд
+ * (внутри группы — по времени по возрастанию). Группы упорядочены по
+ * времени самой ранней записи. Записи без `_traceId` образуют каждая
+ * собственную «группу из одной» и встраиваются между трассами по
+ * своему времени (как обычная time-asc-сортировка для одиночных записей).
+ *
  * @param {Array} logs
- * @param {'time-asc'|'time-desc'|'service'|'level'} sortMode
+ * @param {'time-asc'|'time-desc'|'service'|'level'|'trace'} sortMode
  */
 export function sortLogs(logs, sortMode) {
   const list = [...logs];
@@ -164,6 +256,28 @@ export function sortLogs(logs, sortMode) {
   } else if (sortMode === 'level') {
     const order = { ERROR: 0, WARN: 1, INFO: 2, DEBUG: 3 };
     list.sort((a, b) => (order[a.level] ?? 4) - (order[b.level] ?? 4) || a._timeMs - b._timeMs);
+  } else if (sortMode === 'trace') {
+    // Каждой записи присваиваем bucketKey: traceId, либо уникальный
+    // псевдо-ключ — чтобы записи без traceId не сливались в одну группу.
+    const groupMinTime = new Map();
+    const keyOf = new Map();
+    let anonCounter = 0;
+    for (const e of list) {
+      const key = e._traceId ? `t:${e._traceId}` : `a:${anonCounter++}`;
+      keyOf.set(e, key);
+      const cur = groupMinTime.get(key);
+      if (cur === undefined || e._timeMs < cur) groupMinTime.set(key, e._timeMs);
+    }
+    list.sort((a, b) => {
+      const ka = keyOf.get(a);
+      const kb = keyOf.get(b);
+      if (ka === kb) return a._timeMs - b._timeMs;
+      const ma = groupMinTime.get(ka);
+      const mb = groupMinTime.get(kb);
+      if (ma !== mb) return ma - mb;
+      // tie-break стабильный: лексикографически по ключу
+      return ka < kb ? -1 : 1;
+    });
   }
   return list;
 }

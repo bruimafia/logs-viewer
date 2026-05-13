@@ -12,7 +12,11 @@ import {
   escapeHtml,
   highlightMatch,
   getQuickRange,
-  msToDatetimeLocalValue
+  msToDatetimeLocalValue,
+  getTraceId,
+  traceIdColor,
+  shortTraceId,
+  DEFAULT_TRACE_FIELDS
 } from '../public/utils.js';
 
 // ====================== parseLogLine ======================
@@ -70,6 +74,124 @@ test('parseLogLine: без поля time — _timeMs=0', () => {
 test('parseLogLine: с невалидным time — _timeMs=0 (а не NaN)', () => {
   const entry = parseLogLine('{"time":"бред","msg":"x"}', 'app');
   assert.equal(entry._timeMs, 0);
+});
+
+test('parseLogLine: _traceId извлекается из traceId', () => {
+  const e = parseLogLine('{"msg":"x","traceId":"abc"}', 'app');
+  assert.equal(e._traceId, 'abc');
+});
+
+test('parseLogLine: _traceId извлекается из request_id (snake_case)', () => {
+  const e = parseLogLine('{"msg":"x","request_id":"r1"}', 'app');
+  assert.equal(e._traceId, 'r1');
+});
+
+test('parseLogLine: _traceId — пустая строка при отсутствии trace-полей', () => {
+  const e = parseLogLine('{"msg":"x"}', 'app');
+  assert.equal(e._traceId, '');
+});
+
+// ====================== getTraceId ======================
+
+test('getTraceId: DEFAULT_TRACE_FIELDS включает все основные варианты', () => {
+  assert.deepEqual(DEFAULT_TRACE_FIELDS, [
+    'traceId', 'trace_id', 'requestId', 'request_id', 'correlationId', 'correlation_id'
+  ]);
+});
+
+test('getTraceId: traceId имеет наивысший приоритет', () => {
+  assert.equal(
+    getTraceId({ traceId: 'a', trace_id: 'b', requestId: 'c', request_id: 'd' }),
+    'a'
+  );
+});
+
+test('getTraceId: trace_id, если traceId отсутствует', () => {
+  assert.equal(getTraceId({ trace_id: 'b' }), 'b');
+});
+
+test('getTraceId: requestId / request_id распознаются', () => {
+  assert.equal(getTraceId({ requestId: 'r' }), 'r');
+  assert.equal(getTraceId({ request_id: 'r' }), 'r');
+});
+
+test('getTraceId: correlationId / correlation_id распознаются', () => {
+  assert.equal(getTraceId({ correlationId: 'k' }), 'k');
+  assert.equal(getTraceId({ correlation_id: 'k' }), 'k');
+});
+
+test('getTraceId: число конвертируется в строку', () => {
+  assert.equal(getTraceId({ traceId: 12345 }), '12345');
+  assert.equal(getTraceId({ traceId: 0 }), '0');
+});
+
+test('getTraceId: NaN/Infinity пропускаются', () => {
+  assert.equal(getTraceId({ traceId: NaN, requestId: 'r' }), 'r');
+  assert.equal(getTraceId({ traceId: Infinity, requestId: 'r' }), 'r');
+});
+
+test('getTraceId: пустые/нулевые значения пропускаются — берём следующий вариант', () => {
+  assert.equal(getTraceId({ traceId: '', requestId: 'r' }), 'r');
+  assert.equal(getTraceId({ traceId: null, trace_id: undefined, requestId: 'r' }), 'r');
+});
+
+test('getTraceId: массивы/объекты/булевы значения не считаются trace-полем', () => {
+  assert.equal(getTraceId({ traceId: [1, 2], requestId: 'r' }), 'r');
+  assert.equal(getTraceId({ traceId: {}, requestId: 'r' }), 'r');
+  assert.equal(getTraceId({ traceId: true, requestId: 'r' }), 'r');
+});
+
+test('getTraceId: ни одного распознанного поля — пустая строка', () => {
+  assert.equal(getTraceId({ msg: 'x' }), '');
+});
+
+test('getTraceId: null/undefined/массив на входе — пустая строка', () => {
+  assert.equal(getTraceId(null), '');
+  assert.equal(getTraceId(undefined), '');
+  assert.equal(getTraceId([1, 2, 3]), '');
+});
+
+test('getTraceId: настраиваемый список полей', () => {
+  assert.equal(getTraceId({ xId: 'v' }, ['xId']), 'v');
+  // Если в кастомный список не входит traceId — он игнорируется.
+  assert.equal(getTraceId({ traceId: 'def', xId: 'v' }, ['xId']), 'v');
+});
+
+// ====================== traceIdColor / shortTraceId ======================
+
+test('traceIdColor: возвращает hsl-строку с hue в диапазоне 0..359', () => {
+  for (const tid of ['abc', '550e8400-e29b-41d4-a716-446655440000', '0', 'X', 'long-trace-id-1']) {
+    const c = traceIdColor(tid);
+    assert.match(c, /^hsl\(\d+, 60%, 55%\)$/);
+    const hue = Number(c.match(/^hsl\((\d+)/)[1]);
+    assert.ok(hue >= 0 && hue < 360, `hue ${hue} вне диапазона`);
+  }
+});
+
+test('traceIdColor: детерминирован — один traceId всегда даёт один цвет', () => {
+  assert.equal(traceIdColor('foo'), traceIdColor('foo'));
+  assert.equal(traceIdColor('abc-123'), traceIdColor('abc-123'));
+});
+
+test('traceIdColor: разные traceId обычно дают разный hue (выборочная проверка)', () => {
+  const a = traceIdColor('abc-001');
+  const b = traceIdColor('xyz-999');
+  assert.notEqual(a, b);
+});
+
+test('shortTraceId: короткие строки возвращаются как есть', () => {
+  assert.equal(shortTraceId('abc'), 'abc');
+  assert.equal(shortTraceId('1234567890'), '1234567890'); // ровно 10 символов
+});
+
+test('shortTraceId: длинные строки обрезаются до 8 символов + …', () => {
+  assert.equal(shortTraceId('550e8400-e29b-41d4-a716-446655440000'), '550e8400…');
+});
+
+test('shortTraceId: пустые значения', () => {
+  assert.equal(shortTraceId(''), '');
+  assert.equal(shortTraceId(null), '');
+  assert.equal(shortTraceId(undefined), '');
 });
 
 // ====================== applyFilters ======================
@@ -161,6 +283,53 @@ test('applyFilters: исходный массив не мутирован', () =
   assert.deepEqual(logs, before);
 });
 
+test('applyFilters: traceFilter оставляет только записи с заданным _traceId', () => {
+  const logs = [
+    { _timeMs: 1, _serviceKey: 's', level: 'INFO', msg: 'a', _traceId: 'X' },
+    { _timeMs: 2, _serviceKey: 's', level: 'INFO', msg: 'b', _traceId: 'Y' },
+    { _timeMs: 3, _serviceKey: 's', level: 'INFO', msg: 'c', _traceId: 'X' },
+    { _timeMs: 4, _serviceKey: 's', level: 'INFO', msg: 'd', _traceId: ''  }
+  ];
+  const result = applyFilters(logs, {
+    search: '', activeLevels: [], fromMs: null, toMs: null,
+    serviceVisibility: null, traceFilter: 'X'
+  });
+  assert.deepEqual(result.map(e => e.msg), ['a', 'c']);
+});
+
+test('applyFilters: traceFilter=null/undefined/"" — фильтр отключён', () => {
+  const logs = [
+    { _timeMs: 1, _serviceKey: 's', level: 'INFO', msg: 'a', _traceId: 'X' },
+    { _timeMs: 2, _serviceKey: 's', level: 'INFO', msg: 'b', _traceId: ''  }
+  ];
+  for (const tf of [null, undefined, '']) {
+    const result = applyFilters(logs, {
+      search: '', activeLevels: [], fromMs: null, toMs: null,
+      serviceVisibility: null, traceFilter: tf
+    });
+    assert.equal(result.length, 2, `traceFilter=${String(tf)}`);
+  }
+});
+
+test('applyFilters: traceFilter комбинируется с остальными фильтрами', () => {
+  const logs = [
+    { _timeMs: 1, _serviceKey: 'a', level: 'INFO',  msg: 'hi', _traceId: 'X' },
+    { _timeMs: 2, _serviceKey: 'a', level: 'ERROR', msg: 'oops', _traceId: 'X' },
+    { _timeMs: 3, _serviceKey: 'b', level: 'ERROR', msg: 'oops', _traceId: 'X' },
+    { _timeMs: 4, _serviceKey: 'a', level: 'ERROR', msg: 'oops', _traceId: 'Y' }
+  ];
+  const result = applyFilters(logs, {
+    search: '',
+    activeLevels: ['ERROR'],
+    fromMs: null, toMs: null,
+    serviceVisibility: { a: true, b: false },
+    traceFilter: 'X'
+  });
+  // Должна остаться только запись с traceId=X, уровнем ERROR и сервисом a
+  assert.equal(result.length, 1);
+  assert.equal(result[0]._timeMs, 2);
+});
+
 // ====================== sortLogs ======================
 
 test('sortLogs: time-asc возрастает', () => {
@@ -186,53 +355,91 @@ test('sortLogs: по сервису, потом по времени', () => {
     { _timeMs: 150, _serviceKey: 'a' }
   ];
   const result = sortLogs(logs, 'service');
-  assert.deepEqual(result.map(e => `${e._serviceKey}/${e._timeMs}`), ['a/100', 'a/150', 'b/200']);
+  assert.deepEqual(
+    result.map(e => `${e._serviceKey}/${e._timeMs}`),
+    ['a/100', 'a/150', 'b/200']
+  );
 });
 
-test('sortLogs: по уровню — порядок ERROR<WARN<INFO<DEBUG<остальное', () => {
+test('sortLogs: по уровню — ERROR/WARN/INFO/DEBUG, неизвестные в конце', () => {
   const logs = [
     { _timeMs: 1, level: 'INFO' },
     { _timeMs: 2, level: 'ERROR' },
     { _timeMs: 3, level: 'DEBUG' },
     { _timeMs: 4, level: 'WARN' },
-    { _timeMs: 5, level: 'TRACE' }   // неизвестный — в конце
+    { _timeMs: 5, level: 'TRACE' /* неизвестный */ }
   ];
   const result = sortLogs(logs, 'level');
   assert.deepEqual(result.map(e => e.level), ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']);
 });
 
-test('sortLogs: исходный массив не мутирован', () => {
-  const logs = [{ _timeMs: 200 }, { _timeMs: 100 }];
-  const before = [...logs];
-  sortLogs(logs, 'time-asc');
+test('sortLogs: режим trace группирует записи по traceId, между группами — по minTime', () => {
+  const logs = [
+    { _timeMs: 100, _traceId: 'X', _serviceKey: 's' },
+    { _timeMs: 200, _traceId: '',  _serviceKey: 's' },
+    { _timeMs: 50,  _traceId: 'Y', _serviceKey: 's' },
+    { _timeMs: 300, _traceId: 'X', _serviceKey: 's' },
+    { _timeMs: 150, _traceId: '',  _serviceKey: 's' }
+  ];
+  const result = sortLogs(logs, 'trace');
+  // Y(50) → X-100 → X-300 (группа X цельная) → anon-150 → anon-200
+  assert.deepEqual(
+    result.map(e => `${e._traceId || '-'}/${e._timeMs}`),
+    ['Y/50', 'X/100', 'X/300', '-/150', '-/200']
+  );
+});
+
+test('sortLogs: режим trace без traceId — фактически time-asc для одиночных', () => {
+  const logs = [
+    { _timeMs: 300, _traceId: '' },
+    { _timeMs: 100, _traceId: '' },
+    { _timeMs: 200, _traceId: '' }
+  ];
+  const result = sortLogs(logs, 'trace');
+  assert.deepEqual(result.map(e => e._timeMs), [100, 200, 300]);
+});
+
+test('sortLogs: режим trace — группа сохраняет внутренний порядок по времени', () => {
+  // Одна большая трасса с пересекающимися по времени записями
+  const logs = [
+    { _timeMs: 500, _traceId: 'T' },
+    { _timeMs: 100, _traceId: 'T' },
+    { _timeMs: 300, _traceId: 'T' },
+    { _timeMs: 200, _traceId: 'T' }
+  ];
+  const result = sortLogs(logs, 'trace');
+  assert.deepEqual(result.map(e => e._timeMs), [100, 200, 300, 500]);
+});
+
+test('sortLogs: режим trace — исходный массив не мутируется', () => {
+  const logs = [
+    { _timeMs: 2, _traceId: 'B' },
+    { _timeMs: 1, _traceId: 'A' }
+  ];
+  const before = logs.map(e => ({ ...e }));
+  sortLogs(logs, 'trace');
   assert.deepEqual(logs, before);
 });
 
 // ====================== formatBytes ======================
 
-test('formatBytes: 0 → "0 B"', () => {
+test('formatBytes: 0/null/undefined → "0 B"', () => {
   assert.equal(formatBytes(0), '0 B');
-});
-
-test('formatBytes: null/undefined → "0 B"', () => {
   assert.equal(formatBytes(null), '0 B');
   assert.equal(formatBytes(undefined), '0 B');
 });
 
-test('formatBytes: KB / MB / GB', () => {
+test('formatBytes: байты, килобайты, мегабайты', () => {
+  assert.equal(formatBytes(512), '512 B');
   assert.equal(formatBytes(1024), '1 KB');
+  assert.equal(formatBytes(1536), '1.5 KB');
   assert.equal(formatBytes(1024 * 1024), '1 MB');
   assert.equal(formatBytes(1024 * 1024 * 1024), '1 GB');
 });
 
-test('formatBytes: дробная часть округляется до десятой', () => {
-  assert.equal(formatBytes(1536), '1.5 KB');
-});
-
 // ====================== escapeHtml ======================
 
-test('escapeHtml (Node-ветка): экранирует основные спецсимволы', () => {
-  // В Node нет document — модуль использует ручную замену.
+test('escapeHtml: спецсимволы HTML экранируются', () => {
   assert.equal(escapeHtml('<script>alert("x")</script>'),
     '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;');
 });

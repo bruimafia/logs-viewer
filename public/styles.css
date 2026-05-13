@@ -856,3 +856,104 @@ mark.search-match {
 }
 :root[data-theme="dark"] .theme-toggle .theme-icon-sun { display: block; }
 :root[data-theme="light"] .theme-toggle .theme-icon-moon { display: block; }
+
+/* ============================================================
+ * Дополнения для группировки/трассировки по traceId (пункт 2.1).
+ * Этот блок нужно ДОБАВИТЬ в конец файла public/styles.css.
+ * Не заменяет существующие правила, только добавляет новые классы.
+ * ============================================================ */
+
+/* === Бейдж traceId внутри строки лога === */
+/* Кликабельная инлайн-«таблетка» перед текстом сообщения.
+   Стабильный цвет приходит из render.js через CSS-переменную --trace-color
+   (рассчитывается из хэша traceId, см. utils.js → traceIdColor). */
+.log-trace-badge {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: baseline;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 2px 6px;
+  margin-right: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  background: color-mix(in srgb, var(--trace-color, var(--info)) 15%, transparent);
+  color: var(--trace-color, var(--info));
+  border: 1px solid color-mix(in srgb, var(--trace-color, var(--info)) 40%, transparent);
+  transition: background 0.12s, border-color 0.12s, transform 0.05s;
+}
+.log-trace-badge:hover {
+  background: color-mix(in srgb, var(--trace-color, var(--info)) 28%, transparent);
+  border-color: color-mix(in srgb, var(--trace-color, var(--info)) 70%, transparent);
+}
+.log-trace-badge:active {
+  transform: translateY(1px);
+}
+.log-trace-badge.active {
+  background: var(--trace-color, var(--info));
+  color: #fff;
+  border-color: var(--trace-color, var(--info));
+}
+
+/* Фолбэк для браузеров без color-mix (старее ~2023):
+   простая полупрозрачная подложка по основному цвету. */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .log-trace-badge {
+    background: var(--info-tint);
+    border-color: var(--border);
+  }
+  .log-trace-badge:hover { background: var(--info-tint-strong); }
+}
+
+/* === Баннер активного фильтра по traceId === */
+/* Появляется между toolbar и log-list-wrap, когда выставлен
+   state.currentTraceFilter. Видимостью управляет render.js
+   (display: '' / 'none'). */
+.trace-filter-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  background: var(--info-tint-strong);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text);
+}
+.trace-filter-label {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.trace-filter-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60ch;
+  white-space: nowrap;
+}
+.trace-filter-clear {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.trace-filter-clear:hover {
+  border-color: var(--error);
+  color: var(--error);
+  background: var(--error-tint);
+}

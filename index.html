@@ -101,12 +101,21 @@
           <option value="time-desc">По времени (сначала новые)</option>
           <option value="service">По сервису</option>
           <option value="level">По уровню</option>
+          <option value="trace">По трассе (traceId)</option>
         </select>
       </label>
       <div class="toolbar-services-wrap">
         <span class="services-label">Сервисы:</span>
         <div class="services-filter" id="servicesFilter"></div>
       </div>
+    </div>
+
+    <!-- Баннер активного фильтра по traceId. Скрыт по умолчанию,
+         показывается из render.js при выставлении state.currentTraceFilter. -->
+    <div class="trace-filter-banner" id="traceFilterBanner" style="display: none;" role="status">
+      <span class="trace-filter-label">Фильтр по трассе:</span>
+      <code class="trace-filter-value" id="traceFilterValue"></code>
+      <button type="button" class="trace-filter-clear" id="traceFilterClear" title="Снять фильтр" aria-label="Снять фильтр по трассе">×</button>
     </div>
 
     <div class="log-list-wrap" id="logListWrap">
