@@ -11,6 +11,7 @@ import {
   updateLiveIndicator,
   setStopLiveStreamHandler
 } from './render.js';
+import { toast } from './toast.js';
 
 // ====================== Парсер SSE ======================
 
@@ -169,7 +170,10 @@ export async function loadTailMode(filesToLoad) {
   progressContainer.remove();
 
   if (errorCount > 0) {
-    alert(`Загружено: ${successCount}, ошибок: ${errorCount}. Подробности в консоли.`);
+    toast.error(
+      `Загружено: ${successCount}, ошибок: ${errorCount}.\nПодробности в консоли.`,
+      { title: 'Ошибка загрузки хвоста' }
+    );
   }
 }
 
@@ -215,9 +219,13 @@ export async function loadMorePages() {
   dom.loadMoreBtn.disabled = false;
 
   if (errors.length > 0) {
-    alert('Ошибки при загрузке:\n' + errors.join('\n'));
+    toast.error('Ошибки при загрузке:\n' + errors.join('\n'), {
+      title: 'Не удалось подгрузить страницу'
+    });
   } else if (totalAdded === 0) {
-    alert('Новых строк не получено — вероятно, достигнуто начало файла.');
+    toast.info('Новых строк не получено — вероятно, достигнуто начало файла.', {
+      title: 'Конец файла'
+    });
   }
 }
 
@@ -285,7 +293,10 @@ export async function loadRangeMode(filesToLoad) {
   progressContainer.remove();
 
   if (errorCount > 0) {
-    alert(`Загружено: ${successCount}, ошибок: ${errorCount}. Подробности в консоли.`);
+    toast.error(
+      `Загружено: ${successCount}, ошибок: ${errorCount}.\nПодробности в консоли.`,
+      { title: 'Ошибка загрузки диапазона' }
+    );
   }
 }
 
@@ -553,7 +564,9 @@ async function runLiveGroup(server, files, initialLines, group) {
       }
       const errorCount = Array.from(fileState.values()).filter(s => !s.ended).length;
       if (errorCount > 0) {
-        alert(`Ошибка live-потоков [${server.name}]: ${err.message}`);
+        toast.error(err.message, {
+          title: `Ошибка live-потоков [${server.name}]`
+        });
       }
     }
     throw err;

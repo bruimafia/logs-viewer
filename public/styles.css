@@ -957,3 +957,161 @@ mark.search-match {
   color: var(--error);
   background: var(--error-tint);
 }
+
+/* ============================================================
+ * Toast-уведомления (пункт 6.1 плана улучшений).
+ * Этот блок нужно ДОБАВИТЬ в конец файла public/styles.css.
+ * Не заменяет существующие правила, только добавляет новые классы.
+ * ============================================================ */
+
+/* === Контейнер тостов === */
+/* Фиксированно в правом нижнем углу. pointer-events: none, чтобы
+   пустое пространство контейнера не перехватывало клики по интерфейсу;
+   сами тосты возвращают pointer-events: auto. */
+.toast-container {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+/* === Тост === */
+/* Используем CSS Grid вместо flex: ровно три колонки (иконка / контент /
+   крестик), и при необходимости — отдельная строка под кнопки действий
+   (toast-actions занимает всю ширину). */
+.toast {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  column-gap: 12px;
+  align-items: start;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--info);
+  border-radius: var(--radius);
+  box-shadow: var(--modal-shadow);
+  font-size: 13px;
+  color: var(--text);
+  animation: toast-in 0.18s ease-out;
+}
+
+.toast.toast-hide {
+  animation: toast-out 0.18s ease-in forwards;
+}
+
+.toast-icon {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+  user-select: none;
+}
+
+.toast-content { min-width: 0; }
+
+.toast-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+  line-height: 1.3;
+}
+
+.toast-message {
+  line-height: 1.4;
+  word-wrap: break-word;
+  /* pre-line чтобы поддерживать \n из сообщений типа «Ошибки при загрузке:\n…» */
+  white-space: pre-line;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  align-self: start;
+  margin-top: -1px;
+}
+.toast-close:hover { color: var(--text); }
+
+/* Полоса с кнопками действий внутри toastConfirm */
+.toast-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.toast-action-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.toast-action-btn:hover {
+  background: var(--btn-hover);
+  border-color: var(--text-muted);
+}
+.toast-action-btn.primary {
+  background: var(--info);
+  border-color: var(--info);
+  color: #fff;
+}
+.toast-action-btn.primary:hover {
+  background: var(--btn-primary-hover);
+  border-color: var(--btn-primary-hover);
+}
+.toast-action-btn.danger {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+}
+.toast-action-btn.danger:hover {
+  background: var(--btn-danger-hover);
+  border-color: var(--btn-danger-hover);
+}
+
+/* === Типы: цвет левой полосы и иконки === */
+.toast.toast-success { border-left-color: var(--success); }
+.toast.toast-success .toast-icon { color: var(--success); }
+
+.toast.toast-info    { border-left-color: var(--info); }
+.toast.toast-info    .toast-icon { color: var(--info); }
+
+.toast.toast-warn    { border-left-color: var(--warn); }
+.toast.toast-warn    .toast-icon { color: var(--warn); }
+
+.toast.toast-error   { border-left-color: var(--error); background: var(--error-tint); }
+.toast.toast-error   .toast-icon { color: var(--error); }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(20px); }
+}
+
+/* На узких экранах растягиваем тосты на всю ширину. */
+@media (max-width: 600px) {
+  .toast-container {
+    right: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: auto;
+  }
+}

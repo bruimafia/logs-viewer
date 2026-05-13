@@ -24,6 +24,7 @@ import {
   closeRemoteModal,
   loadSelectedRemoteFiles
 } from './remote-modal.js';
+import { toastConfirm } from './toast.js';
 
 // ====================== Загрузка локальных файлов ======================
 
@@ -139,11 +140,19 @@ dom.loadRemoteBtn.addEventListener('click', () => loadSelectedRemoteFiles());
 
 dom.loadMoreBtn.addEventListener('click', () => loadMorePages());
 
-dom.stopAllLiveBtn.addEventListener('click', (e) => {
+dom.stopAllLiveBtn.addEventListener('click', async (e) => {
   e.stopPropagation();
-  if (confirm(`Остановить все live-потоки (${state.liveStreams.size})?`)) {
-    stopAllLive();
-  }
+  const count = state.liveStreams.size;
+  const ok = await toastConfirm(
+    `Остановить все live-потоки (${count})?`,
+    {
+      title: 'Подтвердите остановку',
+      confirmText: 'Остановить',
+      cancelText: 'Отмена',
+      danger: true
+    }
+  );
+  if (ok) stopAllLive();
 });
 
 dom.liveIndicator.addEventListener('click', (e) => {

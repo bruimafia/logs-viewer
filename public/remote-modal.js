@@ -5,6 +5,7 @@ import { state, dom } from './state.js';
 import { escapeHtml } from './utils.js';
 import { LIVE_BUFFER_CAP } from './state.js';
 import { loadTailMode, loadRangeMode, startLiveMode } from './sse-client.js';
+import { toast } from './toast.js';
 
 // ====================== Открытие / закрытие ======================
 
@@ -311,7 +312,7 @@ export async function loadSelectedRemoteFiles() {
       closeRemoteModal();
     }
   } catch (err) {
-    alert('Ошибка: ' + err.message);
+    toast.error(err.message, { title: 'Ошибка загрузки' });
   } finally {
     dom.loadRemoteBtn.disabled = state.selectedFiles.size === 0;
     dom.loadRemoteBtn.textContent = originalText;
