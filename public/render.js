@@ -11,7 +11,9 @@ import {
   applyFilters,
   sortLogs,
   traceIdColor,
-  shortTraceId
+  shortTraceId,
+  serviceColor,
+  serviceIcon
 } from './utils.js';
 
 // ====================== Чипы сервисов ======================
@@ -21,8 +23,28 @@ export function buildServiceChips() {
   Object.keys(state.fileNames).sort().forEach(service => {
     const chip = document.createElement('span');
     chip.className = 'service-chip' + (state.serviceVisibility[service] ? '' : ' hidden');
-    chip.textContent = service;
+    // Цвет сервиса передаётся в CSS как переменная (пункт 6.5 плана улучшений).
+    // Это позволяет правилам styles.css использовать color-mix() и автоматически
+    // подстраиваться под тёмную/светлую тему: фон — лёгкий тинт, граница и текст —
+    // того же цветового тона, но плотнее.
+    chip.style.setProperty('--service-color', serviceColor(service));
     chip.title = 'Клик: скрыть/показать логи этого сервиса';
+
+    // Иконку и подпись делаем отдельными span'ами — это позволяет CSS управлять
+    // их цветом независимо (например, гасить иконку на скрытом чипе сильнее, чем
+    // текст). Иконка скрыта от скринридеров — это чисто визуальный маркер.
+    const iconEl = document.createElement('span');
+    iconEl.className = 'service-icon';
+    iconEl.setAttribute('aria-hidden', 'true');
+    iconEl.textContent = serviceIcon(service);
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'service-label';
+    labelEl.textContent = service;
+
+    chip.appendChild(iconEl);
+    chip.appendChild(labelEl);
+
     chip.addEventListener('click', () => {
       state.serviceVisibility[service] = !state.serviceVisibility[service];
       chip.classList.toggle('hidden', !state.serviceVisibility[service]);
@@ -254,6 +276,13 @@ export function render() {
         `${escapeHtml(short)}</button> `;
     }
 
+    // Цвет и иконка сервиса (пункт 6.5 плана улучшений). Переменная
+    // --service-color используется правилами styles.css для фона/границы/
+    // цвета текста. Иконка идёт отдельным span'ом — это упрощает CSS-таргетинг.
+    const svc      = entry._serviceKey || '';
+    const svcColor = serviceColor(svc);
+    const svcIcon  = serviceIcon(svc);
+
     // Полная временная метка идёт в нативный tooltip (`title`) — день недели,
     // время с миллисекундами, таймзона, ISO 8601, «N минут назад». Пункт 6.3.
     // formatTimeFull возвращает '' для нулевого/невалидного времени —
@@ -262,7 +291,7 @@ export function render() {
     row.innerHTML = `
       <span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs)}</span>
       <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
-      <span class="log-service">${escapeHtml(entry._serviceKey || '')}</span>
+      <span class="log-service" style="--service-color:${svcColor}" title="Сервис: ${escapeHtml(svc)}"><span class="service-icon" aria-hidden="true">${escapeHtml(svcIcon)}</span><span class="service-label">${escapeHtml(svc)}</span></span>
       <span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>
       ${extraKeys.length ? `
         <div class="log-extra">

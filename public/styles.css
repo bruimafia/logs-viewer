@@ -1130,3 +1130,106 @@ mark.search-match {
     width: auto;
   }
 }
+
+/* ============================================================
+ * Подсветка цветом и иконками для сервисов (пункт 6.5 плана улучшений).
+ * Этот блок нужно ДОБАВИТЬ в конец файла public/styles.css.
+ * Не заменяет существующие правила, только переопределяет цвета
+ * через CSS-переменную --service-color и добавляет геометрию для
+ * .service-icon.
+ *
+ * --service-color приходит из render.js через inline-style:
+ *   <span class="service-chip" style="--service-color: hsl(217, 55%, 50%)">
+ * Цвет вычисляется из имени сервиса (utils.js → serviceColor) — стабильно
+ * один и тот же для одного и того же имени. Иконка (.service-icon)
+ * подбирается оттуда же — см. serviceIcon().
+ *
+ * Дизайн-цели:
+ *   • быстро отличать сервисы взглядом — и в чипах фильтра, и в списке;
+ *   • не перетягивать внимание с уровня (ERROR/WARN — приоритетнее);
+ *   • в тёмной/светлой теме оставаться читаемым (через color-mix с
+ *     текущим --text/--surface/--bg).
+ * ============================================================ */
+
+/* === Чип сервиса в фильтре === */
+/* Существующее правило .service-chip задаёт геометрию (padding, gap,
+   font, cursor) — здесь только переопределяем цвета.
+   color-mix дает мягкий тинт фона и приглушённый текст того же тона. */
+.service-chip {
+  background: color-mix(in srgb, var(--service-color, transparent) 14%, var(--bg));
+  border-color: color-mix(in srgb, var(--service-color, var(--border)) 45%, var(--border));
+  color: color-mix(in srgb, var(--service-color, var(--text)) 80%, var(--text));
+}
+.service-chip:hover {
+  background: color-mix(in srgb, var(--service-color, transparent) 22%, var(--bg));
+  border-color: color-mix(in srgb, var(--service-color, var(--text-muted)) 70%, var(--border));
+}
+
+/* Иконка-маркер сервиса. Цвет — насыщенный --service-color (на тинте фона
+   читается, не сливается). Размер и line-height фиксируем, чтобы иконки
+   разной «высоты» (◆ vs ★ vs ●) не дёргали бейслайн в чипе. */
+.service-chip .service-icon,
+.log-service  .service-icon {
+  color: var(--service-color, var(--text-muted));
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.service-chip .service-label,
+.log-service  .service-label {
+  line-height: 1;
+}
+
+/* Скрытый чип — гасим цвет до нейтрального серого. Существующее правило
+   `.service-chip.hidden { opacity: 0.4; text-decoration: line-through; }`
+   остаётся в силе и комбинируется с этим. Идея: визуально «выключенный»
+   сервис не должен сохранять свой яркий цветовой акцент — иначе он
+   продолжает привлекать внимание, хотя данных от него не видно. */
+.service-chip.hidden {
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+.service-chip.hidden .service-icon {
+  color: var(--text-muted);
+}
+
+/* === Столбец сервиса в строке лога === */
+/* Существующее правило .log-service задаёт фон var(--border) и цвет
+   var(--text). Переопределяем под --service-color и переводим в
+   inline-flex, чтобы иконка и подпись выровнялись по центру с зазором. */
+.log-service {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--service-color, var(--border)) 18%, var(--surface));
+  color: color-mix(in srgb, var(--service-color, var(--text)) 60%, var(--text));
+  border: 1px solid color-mix(in srgb, var(--service-color, var(--border)) 28%, transparent);
+  /* Возмещаем 2 px, которые добавил border, — суммарная высота чипа
+     остаётся той же, что и без border-а. */
+  padding: 1px 7px;
+  cursor: default;
+}
+
+/* Фолбэк для браузеров без color-mix (старее ~2023):
+   оставляем исходный нейтральный вид — пользователь увидит сервисные
+   чипы без цветовых тинтов, но всё остальное работает. Иконка остаётся
+   видимой (контрастная по умолчанию). */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .service-chip {
+    background: var(--bg);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .service-chip:hover { border-color: var(--text-muted); }
+  .log-service {
+    background: var(--border);
+    color: var(--text);
+    border-color: transparent;
+    padding: 2px 8px;
+  }
+  .service-chip .service-icon,
+  .log-service  .service-icon {
+    color: var(--text-muted);
+  }
+}
