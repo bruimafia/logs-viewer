@@ -437,7 +437,22 @@ header {
   100% { background: var(--row-bg); }
 }
 
-.log-time   { color: var(--text-muted); white-space: nowrap; }
+.log-time {
+  color: var(--text-muted);
+  white-space: nowrap;
+  /* cursor: help визуально намекает, что при наведении появится подсказка
+     с полной временной меткой — день недели, время с миллисекундами,
+     таймзона, ISO 8601, «N минут назад». Пункт 6.3 плана улучшений. */
+  cursor: help;
+  /* Подчёркивание точечной линией — традиционный для веба визуальный
+     сигнал «здесь есть подсказка». Делаем его очень бледным, чтобы не
+     перетягивать внимание; на :hover чуть усиливаем. */
+  text-decoration: underline dotted var(--border);
+  text-underline-offset: 3px;
+}
+.log-time:hover {
+  text-decoration-color: var(--text-muted);
+}
 .log-level  { font-weight: 500; }
 .log-level.level-ERROR { color: var(--error); }
 .log-level.level-WARN  { color: var(--warn); }

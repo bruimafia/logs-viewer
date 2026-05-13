@@ -16,7 +16,9 @@ import {
   getTraceId,
   traceIdColor,
   shortTraceId,
-  DEFAULT_TRACE_FIELDS
+  DEFAULT_TRACE_FIELDS,
+  formatTimeFull,
+  formatRelativeTime
 } from '../public/utils.js';
 
 // ====================== parseLogLine ======================
@@ -609,4 +611,106 @@ test('msToDatetimeLocalValue: round-trip через datetime-local', () => {
   const original = '2024-07-08T13:45:22';
   const ms = new Date(original).getTime();
   assert.equal(msToDatetimeLocalValue(ms), original);
+});
+
+// ====================== formatRelativeTime ======================
+// Чистая функция: nowMs передаётся явно, чтобы тесты не зависели от Date.now().
+
+test('formatRelativeTime: совсем недавно → "только что"', () => {
+  const now = 1_700_000_000_000;
+  assert.equal(formatRelativeTime(now,         now), 'только что');
+  assert.equal(formatRelativeTime(now - 3_000, now), 'только что');
+});
+
+test('formatRelativeTime: будущее в пределах нескольких секунд → "через мгновение"', () => {
+  const now = 1_700_000_000_000;
+  assert.equal(formatRelativeTime(now + 2_000, now), 'через мгновение');
+});
+
+test('formatRelativeTime: секунды — русское склонение one/few/many', () => {
+  const now = 1_700_000_000_000;
+  assert.equal(formatRelativeTime(now - 21_000, now), '21 секунду назад');
+  assert.equal(formatRelativeTime(now - 23_000, now), '23 секунды назад');
+  assert.equal(formatRelativeTime(now - 25_000, now), '25 секунд назад');
+  // Граница 11 — особый случай (mod10=1, но mod100=11 → many)
+  assert.equal(formatRelativeTime(now - 11_000, now), '11 секунд назад');
+});
+
+test('formatRelativeTime: минуты в прошлом', () => {
+  const now = 1_700_000_000_000;
+  assert.equal(formatRelativeTime(now -      60_000, now), '1 минуту назад');
+  assert.equal(formatRelativeTime(now -  5 * 60_000, now), '5 минут назад');
+  assert.equal(formatRelativeTime(now - 22 * 60_000, now), '22 минуты назад');
+});
+
+test('formatRelativeTime: часы в прошлом', () => {
+  const now = 1_700_000_000_000;
+  assert.equal(formatRelativeTime(now -      3_600_000, now), '1 час назад');
+  assert.equal(formatRelativeTime(now -  2 * 3_600_000, now), '2 часа назад');
+  assert.equal(formatRelativeTime(now -  5 * 3_600_000, now), '5 часов назад');
+});
+
+test('formatRelativeTime: дни в прошлом', () => {
+  const now = 1_700_000_000_000;
+  assert.equal(formatRelativeTime(now -      86_400_000, now), '1 день назад');
+  assert.equal(formatRelativeTime(now -  3 * 86_400_000, now), '3 дня назад');
+  assert.equal(formatRelativeTime(now -  7 * 86_400_000, now), '7 дней назад');
+});
+
+test('formatRelativeTime: будущее за порогом — "через N единиц"', () => {
+  const now = 1_700_000_000_000;
+  assert.equal(formatRelativeTime(now + 10 * 60_000,    now), 'через 10 минут');
+  assert.equal(formatRelativeTime(now +  2 * 3_600_000, now), 'через 2 часа');
+});
+
+test('formatRelativeTime: null/undefined/0/NaN → ""', () => {
+  assert.equal(formatRelativeTime(null,      Date.now()), '');
+  assert.equal(formatRelativeTime(undefined, Date.now()), '');
+  assert.equal(formatRelativeTime(0,         Date.now()), '');
+  assert.equal(formatRelativeTime(NaN,       Date.now()), '');
+});
+
+// ====================== formatTimeFull ======================
+
+test('formatTimeFull: null/0/NaN → "" (title не выставится в DOM)', () => {
+  assert.equal(formatTimeFull(null),      '');
+  assert.equal(formatTimeFull(undefined), '');
+  assert.equal(formatTimeFull(0),         '');
+  assert.equal(formatTimeFull(NaN),       '');
+});
+
+test('formatTimeFull: содержит ISO с миллисекундами', () => {
+  const iso = '2024-01-15T07:30:45.123Z';
+  const ms  = Date.parse(iso);
+  // now == ms, чтобы относительная часть была фиксирована («только что»)
+  const full = formatTimeFull(ms, ms);
+  assert.ok(full.includes(`ISO: ${iso}`), `ISO-строки нет в:\n${full}`);
+});
+
+test('formatTimeFull: включает относительное время', () => {
+  const ms  = Date.parse('2024-01-15T07:30:45.123Z');
+  const now = ms + 10 * 60_000;
+  const full = formatTimeFull(ms, now);
+  assert.ok(full.includes('10 минут назад'), `relative-строки нет в:\n${full}`);
+});
+
+test('formatTimeFull: 4 строки — дата / время+TZ / ISO / relative', () => {
+  const ms = Date.parse('2024-01-15T07:30:45.123Z');
+  const lines = formatTimeFull(ms, ms + 60_000).split('\n');
+  assert.equal(lines.length, 4, `ожидали 4 строки, получили:\n${lines.join('\n')}`);
+  assert.match(lines[1], /UTC[+-]\d{2}:\d{2}/);  // вторая строка — время с TZ
+  assert.ok(lines[2].startsWith('ISO: '));       // третья — ISO
+});
+
+test('formatTimeFull: время в формате HH:MM:SS.mmm с миллисекундами и TZ', () => {
+  const ms   = Date.parse('2024-01-15T07:30:45.123Z');
+  const full = formatTimeFull(ms, ms);
+  assert.match(full, /\d{2}:\d{2}:\d{2}\.\d{3} \(UTC[+-]\d{2}:\d{2}\)/);
+});
+
+test('formatTimeFull: при пропуске relative (граничный случай "только что") всё ещё 4 строки', () => {
+  // now == ms даёт "только что" — это валидная непустая relative-часть,
+  // т.е. 4 строки гарантированы для любого корректного ms.
+  const ms = Date.parse('2024-06-01T00:00:00.000Z');
+  assert.equal(formatTimeFull(ms, ms).split('\n').length, 4);
 });

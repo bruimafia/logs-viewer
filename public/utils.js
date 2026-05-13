@@ -347,3 +347,112 @@ export function msToDatetimeLocalValue(ms) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
          `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
+
+/**
+ * Возвращает многострочную человекочитаемую полную форму временной метки —
+ * предназначена для атрибута `title` (нативный tooltip) на колонке с временем
+ * в строке лога. Пункт 6.3 плана улучшений.
+ *
+ * Формат — 4 строки:
+ *   понедельник, 15 января 2024 г.
+ *   10:30:45.123 (UTC+03:00)
+ *   ISO: 2024-01-15T07:30:45.123Z
+ *   5 минут назад
+ *
+ * Если ms некорректен/нулевой — возвращает пустую строку. Это позволяет
+ * вызывающему коду не выставлять `title` для записей без времени
+ * (`formatTime` в этом случае рисует прочерк, подсказка не нужна).
+ *
+ * @param {?number} ms
+ * @param {?number} [nowMs] — момент «сейчас» для относительного времени.
+ *   В тестах фиксируется; в проде по умолчанию `Date.now()`.
+ * @returns {string}
+ */
+export function formatTimeFull(ms, nowMs) {
+  if (ms == null || !Number.isFinite(ms) || ms === 0) return '';
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return '';
+
+  // День недели + полная дата на русском. Используем явные компоненты,
+  // а не dateStyle: 'full' — так формат стабилен и не зависит от того,
+  // как пользователь переопределил locale-настройки в ОС.
+  const dateStr = d.toLocaleString('ru-RU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+
+  // Время с миллисекундами и смещением TZ — собираем сами, чтобы не
+  // зависеть от locale-форматов (которые могут вставлять U+202F / NBSP
+  // и ломать копипасту из подсказки).
+  const pad = (n, w = 2) => String(n).padStart(w, '0');
+  const hh  = pad(d.getHours());
+  const mm  = pad(d.getMinutes());
+  const ss  = pad(d.getSeconds());
+  const mss = pad(d.getMilliseconds(), 3);
+  // getTimezoneOffset() возвращает минуты с обратным знаком:
+  // для UTC+3 → -180. Поэтому инвертируем.
+  const tzMin  = -d.getTimezoneOffset();
+  const tzSign = tzMin >= 0 ? '+' : '-';
+  const tzAbs  = Math.abs(tzMin);
+  const tzStr  = `UTC${tzSign}${pad(Math.floor(tzAbs / 60))}:${pad(tzAbs % 60)}`;
+  const timeStr = `${hh}:${mm}:${ss}.${mss} (${tzStr})`;
+
+  const isoStr = d.toISOString();
+  const rel    = formatRelativeTime(ms, nowMs);
+
+  return rel
+    ? `${dateStr}\n${timeStr}\nISO: ${isoStr}\n${rel}`
+    : `${dateStr}\n${timeStr}\nISO: ${isoStr}`;
+}
+
+/**
+ * Относительное время вида «5 минут назад», «через 2 часа», «только что».
+ * Берёт первую подходящую единицу (секунды → минуты → часы → дни).
+ * Поддерживает русское склонение по правилам Mod10/Mod100.
+ *
+ * Чистая функция: nowMs можно передать явно — это нужно для тестов
+ * и чтобы во всех частях одного рендера подставлялся один и тот же «сейчас».
+ *
+ * @param {?number} ms
+ * @param {?number} [nowMs] — если опущен, берётся `Date.now()`.
+ * @returns {string} — пустая строка, если ms некорректен.
+ */
+export function formatRelativeTime(ms, nowMs) {
+  if (ms == null || !Number.isFinite(ms) || ms === 0) return '';
+  const now    = nowMs == null ? Date.now() : nowMs;
+  const diff   = now - ms;             // положителен — в прошлом
+  const abs    = Math.abs(diff);
+  const future = diff < 0;
+
+  // Порог «только что» — 5 секунд в обе стороны, чтобы подсказка не дёргалась
+  // каждую секунду на свежеприехавших live-записях.
+  if (abs < 5_000) return future ? 'через мгновение' : 'только что';
+
+  const sec  = Math.round(abs / 1_000);
+  const min  = Math.round(abs / 60_000);
+  const hour = Math.round(abs / 3_600_000);
+  const day  = Math.round(abs / 86_400_000);
+
+  let amount, unit;
+  if (sec  < 60) { amount = sec;  unit = pluralRu(sec,  'секунду', 'секунды', 'секунд'); }
+  else if (min  < 60) { amount = min;  unit = pluralRu(min,  'минуту',  'минуты',  'минут');  }
+  else if (hour < 24) { amount = hour; unit = pluralRu(hour, 'час',     'часа',    'часов');  }
+  else                { amount = day;  unit = pluralRu(day,  'день',    'дня',     'дней');   }
+
+  return future ? `через ${amount} ${unit}` : `${amount} ${unit} назад`;
+}
+
+/**
+ * Русская плюрализация (one/few/many) для числительных:
+ *   1 минута, 2 минуты, 5 минут, 21 минута, 22 минуты, 25 минут
+ * Внутренний хелпер — не экспортируется.
+ */
+function pluralRu(n, one, few, many) {
+  const mod10  = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return many;
+}

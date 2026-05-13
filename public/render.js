@@ -6,6 +6,7 @@ import {
   escapeHtml,
   highlightMatch,
   formatTime,
+  formatTimeFull,
   parseLogLine,
   applyFilters,
   sortLogs,
@@ -253,8 +254,13 @@ export function render() {
         `${escapeHtml(short)}</button> `;
     }
 
+    // Полная временная метка идёт в нативный tooltip (`title`) — день недели,
+    // время с миллисекундами, таймзона, ISO 8601, «N минут назад». Пункт 6.3.
+    // formatTimeFull возвращает '' для нулевого/невалидного времени —
+    // тогда атрибут попадёт пустым, и браузер подсказку не покажет.
+    const timeFullTitle = formatTimeFull(entry._timeMs);
     row.innerHTML = `
-      <span class="log-time">${formatTime(entry._timeMs)}</span>
+      <span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs)}</span>
       <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
       <span class="log-service">${escapeHtml(entry._serviceKey || '')}</span>
       <span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>
