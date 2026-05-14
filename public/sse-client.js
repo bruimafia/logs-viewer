@@ -519,6 +519,14 @@ async function runLiveGroup(server, files, initialLines, group) {
           st.firstLinesReceived = true;
           setLiveLoadingItemStatus(st.key, 'success', 'Подключено');
         }
+        // Пункт 3.1: если активна пауза — копим строки в буфере, в allLogs
+        // не пушаем. SSE-соединение и tail -F на сервере остаются живыми;
+        // строки попадут в общий список через resumeLiveStreams().
+        if (state.liveStreamPaused) {
+          state.livePausedBuffer.push({ lines: data.lines, displayName: st.displayName });
+          updateLiveIndicator(); // обновить счётчик «+N» на кнопке
+          return;
+        }
         const added = addLinesToLogs(data.lines, st.displayName);
         if (added > 0) {
           trimAllLogsIfNeeded();
@@ -627,6 +635,10 @@ export function stopAllLive() {
     try { group.abortController.abort(); } catch (e) {}
   }
   state.liveStreams.clear();
+  // Пункт 3.1: при полной остановке отбрасываем накопленный буфер —
+  // пользователь явно прекратил наблюдение, лишних строк показывать не нужно.
+  state.liveStreamPaused = false;
+  state.livePausedBuffer = [];
   updateLiveIndicator();
 }
 
@@ -639,6 +651,49 @@ function resetAllLogs() {
   state.serviceVisibility = {};
   state.openedFiles = [];
   state.paginatedFiles.clear();
+}
+
+// ====================== Пауза / возобновление (пункт 3.1) ======================
+// При паузе клиент перестаёт добавлять входящие строки в allLogs,
+// но SSE-соединения и серверные `tail -F` процессы продолжают работать —
+// строки копятся в state.livePausedBuffer и применяются на resume.
+
+/**
+ * Поставить live-режим на паузу. Имеет эффект, только если есть активные
+ * live-потоки и пауза ещё не включена.
+ */
+export function pauseLiveStreams() {
+  if (state.liveStreams.size === 0) return;
+  if (state.liveStreamPaused) return;
+  state.liveStreamPaused = true;
+  updateLiveIndicator();
+}
+
+/**
+ * Возобновить live-режим: применить накопленный буфер и снять флаг паузы.
+ * Безопасно вызывать, если пауза не была включена — будет no-op.
+ */
+export function resumeLiveStreams() {
+  if (!state.liveStreamPaused) return;
+  state.liveStreamPaused = false;
+  applyPausedBuffer();
+  updateLiveIndicator();
+}
+
+// Применяет всё, что лежит в livePausedBuffer, в state.allLogs.
+// Сортировка по времени происходит на этапе рендера (sortLogs внутри
+// filterLogs), поэтому строки сами встанут на свои места хронологически.
+function applyPausedBuffer() {
+  if (state.livePausedBuffer.length === 0) return;
+  let totalAdded = 0;
+  for (const item of state.livePausedBuffer) {
+    totalAdded += addLinesToLogs(item.lines, item.displayName);
+  }
+  state.livePausedBuffer = [];
+  if (totalAdded > 0) {
+    trimAllLogsIfNeeded();
+    scheduleRender();
+  }
 }
 
 // Регистрируем stopLiveStream в render.js для использования в индикаторе LIVE

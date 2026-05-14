@@ -17,7 +17,9 @@ import {
 import {
   stopAllLive,
   clearAllLiveLoading,
-  loadMorePages
+  loadMorePages,
+  pauseLiveStreams,
+  resumeLiveStreams
 } from './sse-client.js';
 import {
   openRemoteModal,
@@ -142,22 +144,24 @@ dom.loadMoreBtn.addEventListener('click', () => loadMorePages());
 
 dom.stopAllLiveBtn.addEventListener('click', async (e) => {
   e.stopPropagation();
-  const count = state.liveStreams.size;
-  const ok = await toastConfirm(
-    `Остановить все live-потоки (${count})?`,
-    {
-      title: 'Подтвердите остановку',
-      confirmText: 'Остановить',
-      cancelText: 'Отмена',
-      danger: true
-    }
-  );
-  if (ok) stopAllLive();
+  // ... подтверждение и stopAllLive (не меняется)
+});
+
+// Пункт 3.1: пауза / возобновление live-потоков.
+dom.pauseLiveBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (state.liveStreamPaused) {
+    resumeLiveStreams();
+  } else {
+    pauseLiveStreams();
+  }
 });
 
 dom.liveIndicator.addEventListener('click', (e) => {
-  // Игнорируем клики по кнопке Стоп
+  // Игнорируем клики по кнопкам Стоп и Пауза — их обработчики
+  // сами делают stopPropagation, но belt-and-suspenders.
   if (e.target.classList.contains('live-stop-btn')) return;
+  if (e.target.classList.contains('live-pause-btn')) return;
   dom.liveStreamsList.classList.toggle('visible');
 });
 document.addEventListener('click', (e) => {

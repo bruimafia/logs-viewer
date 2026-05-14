@@ -27,6 +27,16 @@ export const state = {
   // key "serverId::fileId" → { displayName, serverId, fileId, group }
   liveStreams: new Map(),
 
+  // Глобальный флаг паузы live-потоков (пункт 3.1). При true входящие
+  // строки не пушатся в allLogs, а копятся в livePausedBuffer.
+  // SSE-соединение и серверные `tail -F` процессы остаются живыми.
+  liveStreamPaused: false,
+
+  // Буфер строк, накопленных во время паузы. Применяется через
+  // addLinesToLogs при resume; очищается при stopAllLive.
+  // Элементы: { lines: string[], displayName: string }
+  livePausedBuffer: [],
+
   // Дебаунс live-рендера
   renderTimeout: null,
   // Флаг — пользователь прокрутил список и не хочет авто-скролла
@@ -69,6 +79,7 @@ export const dom = {
   liveIndicator: document.getElementById('liveIndicator'),
   liveCount: document.getElementById('liveCount'),
   stopAllLiveBtn: document.getElementById('stopAllLiveBtn'),
+  pauseLiveBtn: document.getElementById('pauseLiveBtn'),
   liveStreamsList: document.getElementById('liveStreamsList'),
   loadMoreWrap: document.getElementById('loadMoreWrap'),
   loadMoreBtn: document.getElementById('loadMoreBtn'),

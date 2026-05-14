@@ -185,6 +185,38 @@ header {
   margin-left: 4px;
 }
 .live-stop-btn:hover { background: var(--btn-danger-hover); }
+/* Кнопка «Пауза / Возобновить» в live-индикаторе (пункт 3.1).
+   Класс .resume выставляется из render.js, когда пауза включена. */
+.live-pause-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.live-pause-btn:hover { background: var(--btn-hover); }
+.live-pause-btn.resume {
+  background: var(--success);
+  color: #fff;
+}
+.live-pause-btn.resume:hover { background: var(--btn-success-hover); }
+
+/* Внешний вид индикатора, когда live-поток на паузе.
+   Пульсация точки выключается, цвета приглушаются — визуальный сигнал,
+   что отображение приостановлено (хотя данные продолжают приходить). */
+.live-indicator.paused {
+  background: var(--surface);
+  border-color: var(--text-muted);
+}
+.live-indicator.paused .live-dot {
+  animation: none;
+  background: var(--text-muted);
+}
+.live-indicator.paused .live-count {
+  background: var(--text-muted);
+}
 .live-streams-list {
   display: none;
   position: absolute;

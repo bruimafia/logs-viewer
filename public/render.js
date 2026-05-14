@@ -97,9 +97,49 @@ let stopLiveStreamFn = null;
 export function setStopLiveStreamHandler(fn) { stopLiveStreamFn = fn; }
 
 export function updateLiveIndicator() {
+  // Пункт 3.1: если все live-потоки закончились естественным образом,
+  // но пауза была включена (или в буфере что-то осталось) — применяем
+  // буфер и сбрасываем флаг. Иначе индикатор спрячется (size === 0)
+  // и нажать «Возобновить» будет нечем — буфер останется висеть в памяти.
+  if (state.liveStreams.size === 0 &&
+      (state.liveStreamPaused || state.livePausedBuffer.length > 0)) {
+    let totalAdded = 0;
+    for (const item of state.livePausedBuffer) {
+      totalAdded += addLinesToLogs(item.lines, item.displayName);
+    }
+    state.livePausedBuffer = [];
+    state.liveStreamPaused = false;
+    if (totalAdded > 0) {
+      trimAllLogsIfNeeded();
+      scheduleRender();
+    }
+  }
+
   if (state.liveStreams.size > 0) {
     dom.liveIndicator.classList.add('active');
     dom.liveCount.textContent = state.liveStreams.size;
+
+    // Пункт 3.1: класс .paused и текст кнопки «Пауза»/«Возобновить».
+    const paused = state.liveStreamPaused;
+    dom.liveIndicator.classList.toggle('paused', paused);
+    if (dom.pauseLiveBtn) {
+      if (paused) {
+        const bufferedCount = state.livePausedBuffer
+          .reduce((sum, item) => sum + item.lines.length, 0);
+        dom.pauseLiveBtn.textContent = bufferedCount > 0
+          ? `▶ Возобновить (+${bufferedCount})`
+          : '▶ Возобновить';
+        dom.pauseLiveBtn.classList.add('resume');
+        dom.pauseLiveBtn.title = bufferedCount > 0
+          ? `Возобновить отображение (${bufferedCount} строк в буфере)`
+          : 'Возобновить отображение';
+      } else {
+        dom.pauseLiveBtn.textContent = 'Пауза';
+        dom.pauseLiveBtn.classList.remove('resume');
+        dom.pauseLiveBtn.title = 'Поставить на паузу — отображение приостановится, приём строк продолжится';
+      }
+    }
+
     dom.liveStreamsList.innerHTML = Array.from(state.liveStreams.values()).map(s => `
       <div class="live-stream-item">
         <span class="live-stream-name" title="${escapeHtml(s.displayName)}">${escapeHtml(s.displayName)}</span>
@@ -114,6 +154,7 @@ export function updateLiveIndicator() {
     });
   } else {
     dom.liveIndicator.classList.remove('active');
+    dom.liveIndicator.classList.remove('paused');
     dom.liveStreamsList.classList.remove('visible');
   }
 }
