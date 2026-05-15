@@ -98,6 +98,15 @@ export const dom = {
   traceFilterValue: document.getElementById('traceFilterValue'),
   traceFilterClear: document.getElementById('traceFilterClear'),
 
+  // Мини-спарклайн со статистикой (пункт 3.4). См. public/sparkline.js.
+  sparklineWrap:    document.getElementById('sparklineWrap'),
+  sparklineCanvas:  document.getElementById('sparklineCanvas'),
+  sparklineAxis:    document.getElementById('sparklineAxis'),
+  sparklineStats:   document.getElementById('sparklineStats'),
+  sparklineWindow:  document.getElementById('sparklineWindow'),
+  sparklineToggle:  document.getElementById('sparklineToggle'),
+  sparklineTooltip: document.getElementById('sparklineTooltip'),
+
   // Контейнер toast-уведомлений (пункт 6.1)
   toastContainer: document.getElementById('toastContainer')
 };

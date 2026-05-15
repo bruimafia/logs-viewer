@@ -1362,3 +1362,174 @@ mark.search-match {
   outline: 2px solid var(--info);
   outline-offset: 2px;
 }
+
+/* ============================================================
+ * Мини-спарклайн со статистикой по уровням (пункт 3.4 плана улучшений).
+ * Узкая полоса под тулбаром с гистограммой количества записей по
+ * уровням ERROR/WARN/INFO/DEBUG за выбранное окно. Логика — в
+ * public/sparkline.js. Полностью пользуется существующими CSS-
+ * переменными темы (--bg/--surface/--border/--error/...).
+ * ============================================================ */
+
+.sparkline-wrap {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 20px 8px;
+  position: relative; /* якорь для абсолютного тултипа */
+}
+.sparkline-wrap[hidden] { display: none; }
+
+.sparkline-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+.sparkline-title {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+.sparkline-window-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.sparkline-window-label select {
+  padding: 2px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* Сводка цифр справа в шапке: ●12 ●3 ●450 ●890 / 1355 */
+.sparkline-stats {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sparkline-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sparkline-stat-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+.sparkline-stats-total { color: var(--text-muted); }
+
+.sparkline-toggle {
+  padding: 2px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.sparkline-toggle:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.sparkline-canvas-wrap { position: relative; }
+.sparkline-canvas {
+  display: block;
+  width: 100%;
+  height: 44px;
+  cursor: pointer;
+  background: var(--bg);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+.sparkline-canvas:hover { border-color: var(--text-muted); }
+
+.sparkline-axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  padding: 0 2px;
+  pointer-events: none;
+}
+
+/* === Тултип над канвасом === */
+.sparkline-tooltip {
+  display: none;
+  position: absolute;
+  z-index: 50;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  box-shadow: var(--modal-shadow);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text);
+  pointer-events: none;
+  white-space: nowrap;
+  min-width: 180px;
+}
+.sparkline-tt-time {
+  font-weight: 600;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 3px;
+}
+.sparkline-tt-dur { color: var(--text-muted); font-weight: 400; }
+.sparkline-tt-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.6;
+}
+.sparkline-tt-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.sparkline-tt-row b {
+  margin-left: auto;
+  font-weight: 600;
+}
+.sparkline-tt-total {
+  margin-top: 4px;
+  padding-top: 3px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.sparkline-tt-total b { color: var(--text); font-weight: 600; }
+.sparkline-tt-hint {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+@media (max-width: 800px) {
+  .sparkline-wrap { padding: 6px 12px; }
+  .sparkline-stats { display: none; }
+  .sparkline-title { display: none; }
+}

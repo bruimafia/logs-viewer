@@ -128,6 +128,37 @@
       </div>
     </div>
 
+    <!-- Мини-спарклайн со статистикой по уровням (пункт 3.4 плана улучшений).
+         Узкая полоса под тулбаром: гистограмма количества записей по
+         уровням ERROR/WARN/INFO/DEBUG за выбранное окно. Обновляется
+         в live-режиме, помогает увидеть всплеск активности. Логика —
+         в public/sparkline.js. -->
+    <div class="sparkline-wrap" id="sparklineWrap" hidden>
+      <div class="sparkline-header">
+        <span class="sparkline-title">Активность</span>
+        <label class="sparkline-window-label">
+          Окно:
+          <select id="sparklineWindow">
+            <option value="300000">5 мин</option>
+            <option value="900000">15 мин</option>
+            <option value="1800000" selected>30 мин</option>
+            <option value="3600000">1 ч</option>
+            <option value="21600000">6 ч</option>
+            <option value="86400000">24 ч</option>
+          </select>
+        </label>
+        <span class="sparkline-stats" id="sparklineStats"></span>
+        <button type="button" class="sparkline-toggle" id="sparklineToggle"
+                aria-pressed="true" title="Скрыть/показать спарклайн">Скрыть</button>
+      </div>
+      <div class="sparkline-canvas-wrap">
+        <canvas id="sparklineCanvas" class="sparkline-canvas"
+                aria-label="Гистограмма количества записей по уровням за выбранное окно"></canvas>
+        <div class="sparkline-tooltip" id="sparklineTooltip" role="tooltip"></div>
+      </div>
+      <div class="sparkline-axis" id="sparklineAxis"></div>
+    </div>
+
     <!-- Баннер активного фильтра по traceId. Скрыт по умолчанию,
          показывается из render.js при выставлении state.currentTraceFilter. -->
     <div class="trace-filter-banner" id="traceFilterBanner" style="display: none;" role="status">

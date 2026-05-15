@@ -28,6 +28,7 @@ import {
 } from './remote-modal.js';
 import { toastConfirm } from './toast.js';
 import { attachErrorAlertHandlers } from './error-alerts.js';
+import { attachSparklineHandlers } from './sparkline.js';
 
 // ====================== Загрузка локальных файлов ======================
 
@@ -177,6 +178,7 @@ attachTraceBadgeHandler();
 attachScrollHandler();
 attachTraceBadgeHandler();
 attachErrorAlertHandlers();  // <-- добавили: пункты 3.2 и 3.3
+attachSparklineHandlers();  // <-- пункт 3.4: мини-спарклайн со статистикой
 
 // ====================== Переключение темы ======================
 

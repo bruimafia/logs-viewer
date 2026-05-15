@@ -15,6 +15,7 @@ import {
   serviceColor,
   serviceIcon
 } from './utils.js';
+import { renderSparkline } from './sparkline.js';
 
 // ====================== Чипы сервисов ======================
 
@@ -368,6 +369,10 @@ export function render() {
       dom.logListWrap.scrollTop = 0;
     }
   }
+
+  // Обновляем мини-спарклайн (пункт 3.4). Дроссель через rAF — несколько
+  // вызовов подряд при live-batch + render схлопнутся в один кадр.
+  renderSparkline();
 }
 
 export function scheduleRender() {
