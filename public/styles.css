@@ -1650,3 +1650,46 @@ mark.search-match {
   padding: 0 4px;
   font-size: 10px;
 }
+
+/* ============================================================
+ * Применяется только внутри .log-extra pre — там, где
+ * render.js вставляет результат highlightJson(JSON.stringify(...)).
+ * Сами классы (.json-key, .json-string, ...) узкие и не пересекаются
+ * с другими стилями проекта.
+ *
+ * Цвета задаются как CSS-переменные, чтобы:
+ *   • тёмная и светлая темы переопределяли только их (см. ниже);
+ *   • в будущем пользователь мог переопределить отдельно
+ *     из, например, customizer'а.
+ *
+ * Существующее правило .log-extra pre mark.search-match
+ * { color: var(--match-fg) } имеет более высокую специфичность
+ * (0,2,2) и продолжает работать поверх (0,2,1) — жёлтый <mark>
+ * для совпадений поиска перекрывает цветовую раскраску, как и
+ * задумано.
+ * ============================================================ */
+
+:root,
+:root[data-theme="dark"] {
+  --json-key:     #9cdcfe;   /* светло-голубой — ключ объекта */
+  --json-string:  #ce9178;   /* лосось — строковое значение */
+  --json-number:  #b5cea8;   /* пастельный зелёный — число */
+  --json-boolean: #c586c0;   /* лавандовый — true/false */
+  --json-null:    #8b949e;   /* серый (== --text-muted) — null */
+}
+
+:root[data-theme="light"] {
+  --json-key:     #0451a5;   /* тёмно-синий */
+  --json-string:  #a31515;   /* бордовый */
+  --json-number:  #098658;   /* тёмно-зелёный */
+  --json-boolean: #af00db;   /* фиолетовый */
+  --json-null:    #6e7681;   /* серый (чуть темнее --text-muted, для контраста на белом) */
+}
+
+/* Сами классы — внутри .log-extra pre, чтобы не «утечь» в другие <pre>
+   страницы (например, в превью файлов в модалке, если такие появятся). */
+.log-extra pre .json-key     { color: var(--json-key);     font-weight: 500; }
+.log-extra pre .json-string  { color: var(--json-string); }
+.log-extra pre .json-number  { color: var(--json-number); }
+.log-extra pre .json-boolean { color: var(--json-boolean); font-weight: 500; }
+.log-extra pre .json-null    { color: var(--json-null); font-style: italic; }

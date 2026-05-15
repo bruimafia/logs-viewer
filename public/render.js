@@ -5,6 +5,7 @@ import { state, dom, LIVE_BUFFER_CAP, LIVE_RENDER_DEBOUNCE_MS } from './state.js
 import {
   escapeHtml,
   highlightMatch,
+  highlightJson,
   formatTime,
   formatTimeFull,
   parseLogLine,
@@ -352,7 +353,7 @@ export function render() {
         <div class="log-extra">
           <details>
             <summary>Доп. поля (${extraKeys.length})</summary>
-            <pre>${highlightMatch(JSON.stringify(extra, null, 2), search)}</pre>
+            <pre>${highlightJson(JSON.stringify(extra, null, 2), search)}</pre>
           </details>
         </div>
       ` : ''}
