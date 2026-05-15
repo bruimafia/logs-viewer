@@ -50,6 +50,23 @@
         <div class="live-streams-list" id="liveStreamsList"></div>
       </div>
 
+      <!-- Уведомления и звуковой сигнал на ERROR (пункты 3.2, 3.3 плана улучшений).
+           Эти галочки всегда видны в шапке: пользователь может включить их
+           заранее, ещё до старта live-режима. Срабатывают только когда live
+           активен и не на паузе — см. error-alerts.js → handleNewLiveEntries. -->
+      <div class="error-alert-toggles" role="group" aria-label="Уведомления о ERROR">
+        <label class="error-alert-toggle" title="Браузерные уведомления о новых ERROR в live-режиме">
+          <input type="checkbox" id="notifyOnErrorToggle">
+          <span class="error-alert-icon" aria-hidden="true">🔔</span>
+          <span class="error-alert-label">Уведомления</span>
+        </label>
+        <label class="error-alert-toggle" title="Звуковой сигнал при появлении ERROR в live-режиме">
+          <input type="checkbox" id="soundOnErrorToggle">
+          <span class="error-alert-icon" aria-hidden="true">🔊</span>
+          <span class="error-alert-label">Звук</span>
+        </label>
+      </div>
+
       <span class="open-files" id="openFilesLabel">Файлы не выбраны</span>
       <span class="stats" id="stats"></span>
       <button type="button" class="btn theme-toggle" id="themeToggle" title="Переключить тему" aria-label="Переключить тему">

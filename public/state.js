@@ -89,6 +89,10 @@ export const dom = {
   liveLoadingTitle: document.getElementById('liveLoadingTitle'),
   themeToggleBtn: document.getElementById('themeToggle'),
 
+  // Галочки 🔔 / 🔊 для пунктов 3.2 и 3.3 (см. public/error-alerts.js).
+  notifyOnErrorToggle: document.getElementById('notifyOnErrorToggle'),
+  soundOnErrorToggle:  document.getElementById('soundOnErrorToggle'),
+
   // Баннер активного фильтра по traceId
   traceFilterBanner: document.getElementById('traceFilterBanner'),
   traceFilterValue: document.getElementById('traceFilterValue'),

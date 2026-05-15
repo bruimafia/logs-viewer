@@ -1265,3 +1265,100 @@ mark.search-match {
     color: var(--text-muted);
   }
 }
+
+/* ============================================================
+ * Уведомления и звуковой сигнал на ERROR (пункты 3.2, 3.3 плана улучшений).
+ * Этот блок нужно ДОБАВИТЬ в конец файла public/styles.css.
+ * Не заменяет существующие правила, только добавляет новые классы.
+ *
+ * Дизайн-цели:
+ *   • Компактные «pill»-кнопки в стиле .level-check и .append-mode-check.
+ *   • Визуально различимое состояние ON/OFF (включено — синяя обводка
+ *     и подкрашенный фон, выключено — нейтральный серый).
+ *   • Иконка-эмодзи (🔔/🔊) — лёгкая, не требует SVG.
+ *   • Скрываем родной чекбокс — клик по всему ярлыку переключает состояние.
+ * ============================================================ */
+
+.error-alert-toggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.error-alert-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.error-alert-toggle:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+.error-alert-toggle input[type="checkbox"] {
+  /* Прячем системный чекбокс — состояние видно по обрамлению ярлыка. */
+  appearance: none;
+  -webkit-appearance: none;
+  width: 0;
+  height: 0;
+  margin: 0;
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Эмодзи-иконки 🔔/🔊 чуть подавляем в выключенном состоянии (filter:
+   grayscale), чтобы не «кричали» цветом, и поднимаем в полную силу при
+   включении. font-size явно — на тёмной теме эмодзи рендерятся мелко. */
+.error-alert-icon {
+  font-size: 14px;
+  line-height: 1;
+  filter: grayscale(1) opacity(0.7);
+  transition: filter 0.15s;
+}
+
+.error-alert-label {
+  line-height: 1;
+}
+
+/* Скрываем подпись на узких экранах — иконки достаточно. */
+@media (max-width: 800px) {
+  .error-alert-label { display: none; }
+  .error-alert-toggle { padding: 6px 8px; }
+}
+
+/* Активное состояние галочки. :has() поддержан во всех современных
+   браузерах с 2022 (Safari 15.4) / 2023 (Firefox 121). Для нашего
+   таргета (5 лет) — достаточно. */
+.error-alert-toggle:has(input:checked) {
+  background: var(--info-tint);
+  border-color: var(--info);
+  color: var(--info);
+}
+.error-alert-toggle:has(input:checked) .error-alert-icon {
+  filter: none;
+}
+
+/* Заблокированное состояние (например, Notification API недоступен
+   или разрешение denied — error-alerts.js может проставить disabled). */
+.error-alert-toggle:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Focus-стиль для клавиатурной навигации (visible, не «дикая» жирная рамка). */
+.error-alert-toggle:focus-within {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}

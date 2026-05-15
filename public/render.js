@@ -105,7 +105,7 @@ export function updateLiveIndicator() {
       (state.liveStreamPaused || state.livePausedBuffer.length > 0)) {
     let totalAdded = 0;
     for (const item of state.livePausedBuffer) {
-      totalAdded += addLinesToLogs(item.lines, item.displayName);
+      totalAdded += addLinesToLogs(item.lines, item.displayName).length;
     }
     state.livePausedBuffer = [];
     state.liveStreamPaused = false;
@@ -206,9 +206,18 @@ export function trimAllLogsIfNeeded() {
 
 // ====================== Добавление контента ======================
 
+/**
+ * Парсит строки и добавляет их в state.allLogs.
+ *
+ * @returns {Array} массив добавленных записей (если ничего не добавилось — пустой).
+ *   Раньше возвращалось число; перешли на массив, чтобы вызывающая сторона
+ *   (sse-client.js → error-alerts.js) могла отфильтровать ERROR без повторного
+ *   парсинга. Все существующие проверки `if (added > 0)` остаются валидными,
+ *   если поменять имя переменной — `if (newEntries.length > 0)`.
+ */
 export function addLinesToLogs(lines, displayName) {
   const name = displayName.replace(/\.(log|json)$/i, '');
-  let added = 0;
+  const added = [];
   for (const line of lines) {
     const entry = parseLogLine(line, name);
     if (entry) {
@@ -217,7 +226,7 @@ export function addLinesToLogs(lines, displayName) {
       const s = entry._serviceKey;
       if (!state.fileNames[s]) state.fileNames[s] = new Set();
       state.fileNames[s].add(displayName);
-      added++;
+      added.push(entry);
     }
   }
   Object.keys(state.fileNames).forEach(s => {

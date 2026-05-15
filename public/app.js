@@ -27,6 +27,7 @@ import {
   loadSelectedRemoteFiles
 } from './remote-modal.js';
 import { toastConfirm } from './toast.js';
+import { attachErrorAlertHandlers } from './error-alerts.js';
 
 // ====================== Загрузка локальных файлов ======================
 
@@ -173,6 +174,9 @@ document.addEventListener('click', (e) => {
 attachScrollHandler();
 // Делегирование клика по бейджам traceId + клик по «✕» в баннере фильтра.
 attachTraceBadgeHandler();
+attachScrollHandler();
+attachTraceBadgeHandler();
+attachErrorAlertHandlers();  // <-- добавили: пункты 3.2 и 3.3
 
 // ====================== Переключение темы ======================
 

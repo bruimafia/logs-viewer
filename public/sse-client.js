@@ -12,6 +12,7 @@ import {
   setStopLiveStreamHandler
 } from './render.js';
 import { toast } from './toast.js';
+import { handleNewLiveEntries } from './error-alerts.js';
 
 // ====================== Парсер SSE ======================
 
@@ -515,10 +516,16 @@ async function runLiveGroup(server, files, initialLines, group) {
       'file-lines': (data) => {
         const st = fileState.get(data.fileId);
         if (!st) return;
-        if (!st.firstLinesReceived) {
+
+        // Первый батч — это исторический хвост (initial lines), про него
+        // алертить не надо: пользователь только что подключился, эти записи
+        // уже произошли. Реальные «новые» события идут со второго батча.
+        const isInitialBatch = !st.firstLinesReceived;
+        if (isInitialBatch) {
           st.firstLinesReceived = true;
           setLiveLoadingItemStatus(st.key, 'success', 'Подключено');
         }
+
         // Пункт 3.1: если активна пауза — копим строки в буфере, в allLogs
         // не пушаем. SSE-соединение и tail -F на сервере остаются живыми;
         // строки попадут в общий список через resumeLiveStreams().
@@ -527,10 +534,17 @@ async function runLiveGroup(server, files, initialLines, group) {
           updateLiveIndicator(); // обновить счётчик «+N» на кнопке
           return;
         }
-        const added = addLinesToLogs(data.lines, st.displayName);
-        if (added > 0) {
+
+        const newEntries = addLinesToLogs(data.lines, st.displayName);
+        if (newEntries.length > 0) {
           trimAllLogsIfNeeded();
           scheduleRender();
+          // Пункты 3.2, 3.3: оповещение об ERROR в live. Пропускаем
+          // первый батч (исторический tail) — иначе при подключении к
+          // активному ошибочному файлу пользователя сразу оглушит.
+          if (!isInitialBatch) {
+            handleNewLiveEntries(newEntries);
+          }
         }
       },
       'file-info': (data) => {
@@ -687,12 +701,15 @@ function applyPausedBuffer() {
   if (state.livePausedBuffer.length === 0) return;
   let totalAdded = 0;
   for (const item of state.livePausedBuffer) {
-    totalAdded += addLinesToLogs(item.lines, item.displayName);
+    totalAdded += addLinesToLogs(item.lines, item.displayName).length;
   }
   state.livePausedBuffer = [];
   if (totalAdded > 0) {
     trimAllLogsIfNeeded();
     scheduleRender();
+    // Сюда специально НЕ зовём handleNewLiveEntries: эти строки пришли
+    // во время паузы, пользователь сам выбрал «не отвлекать» и сейчас
+    // явным жестом разбирает накопленное.
   }
 }
 
