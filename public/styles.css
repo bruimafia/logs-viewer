@@ -1547,3 +1547,106 @@ mark.search-match {
   .sparkline-stats { display: none; }
   .sparkline-title { display: none; }
 }
+
+/* === Чекбокс «Компактно» в шапке === */
+/* Стилизуем под существующий .append-mode-check, чтобы шапка
+   осталась визуально цельной. Отдельный класс, а не reuse, —
+   на случай если в будущем понадобится переоформить (например,
+   сделать кнопкой-иконкой). */
+.compact-mode-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.compact-mode-check input { accent-color: var(--info); cursor: pointer; }
+ 
+/* === Применение компактного режима к строкам логов === */
+ 
+:root[data-compact="true"] .log-entry {
+  /* Паддинг: вертикальный — минимально допустимый, чтобы строки
+     не «слипались» визуально, но не было лишнего воздуха.
+     Горизонтальный — чуть сокращаем (12 → 8), чтобы дать больше
+     места столбцу сообщения. */
+  padding: 3px 8px;
+  margin-bottom: 2px;
+  /* Шрифт — 11 px по ТЗ. Все вложенные .log-time/.log-level/...
+     наследуют размер автоматически (явные `font-size` у них есть
+     только у .log-service — он переопределён ниже). */
+  font-size: 11px;
+  /* Третий трек грид-разметки — это .log-service. В компакте он
+     должен схлопнуться до ширины иконки (а не держать min-width
+     120 px). max-content вместо minmax(120px, max-content)
+     даёт ровно этот эффект. Остальные треки оставляем как есть,
+     чтобы время и уровень имели предсказуемую ширину. */
+  grid-template-columns: 160px 70px max-content 1fr;
+  /* Зазоры между треками уменьшаем — в компакте 12 px ощущается
+     как «дыра» между уровнем и (теперь маленьким) сервисом. */
+  gap: 8px;
+}
+ 
+/* На узких экранах @media (max-width: 900px) исходные правила
+   переопределяют grid-template-columns на двухколоночный layout —
+   там компакт-режим не имеет особого смысла, но пусть хотя бы
+   паддинг и шрифт уменьшаются. Поэтому здесь grid не трогаем,
+   а оставляем фолбэк из медиа-запроса. */
+@media (max-width: 900px) {
+  :root[data-compact="true"] .log-entry {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+ 
+/* Сервис в компакте: только иконка, текст спрятан.
+   display:none у .service-label, а не visibility:hidden — чтобы
+   span не занимал пустое место. Иконка остаётся видна и сохраняет
+   --service-color. Tooltip («Сервис: <name>») приходит с .log-service
+   из render.js и продолжает работать. */
+:root[data-compact="true"] .log-service {
+  /* Паддинг сокращаем, чтобы цветной чип сервиса не выглядел
+     полупустым вокруг одной иконки. Border остаётся — он
+     даёт визуальную «капсулу» вокруг маркера. */
+  padding: 0 5px;
+  min-width: 0;
+  font-size: 11px;
+  /* Помогаем грид-треку схлопнуться: без этого Firefox в редких
+     случаях резервирует место под исчезнувший лейбл. */
+  gap: 0;
+}
+:root[data-compact="true"] .log-service .service-label {
+  display: none;
+}
+/* Иконка слегка увеличена — в компакте она единственный визуальный
+   маркер сервиса, нельзя терять различимость. */
+:root[data-compact="true"] .log-service .service-icon {
+  font-size: 13px;
+}
+ 
+/* Раскрытый блок «Доп. поля» в компакте — тоже плотнее.
+   Это второстепенный контент: его уменьшение не теряет читаемости,
+   но экономит много места при разворачивании сразу нескольких записей. */
+:root[data-compact="true"] .log-extra {
+  margin-top: 2px;
+  padding-top: 3px;
+  font-size: 10px;
+}
+:root[data-compact="true"] .log-extra pre {
+  font-size: 10px;
+  margin-top: 2px;
+}
+ 
+/* Левая цветовая полоска (border-left) — тоньше, чтобы общая высота
+   строки стала ещё меньше. Цвет уровня остаётся тем же. */
+:root[data-compact="true"] .log-entry {
+  border-left-width: 2px;
+}
+ 
+/* Бейдж traceId — слегка ужать вертикально, чтобы не торчал над
+   соседним текстом сообщения. Если бейджи раньше задавали высоту
+   строки — этим правилом мы её сравниваем с обычным текстом. */
+:root[data-compact="true"] .log-trace-badge {
+  padding: 0 4px;
+  font-size: 10px;
+}

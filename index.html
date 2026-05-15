@@ -22,6 +22,21 @@
       }
     })();
   </script>
+  <script>
+    // Применяем компактный режим до рендера body — тогда первый paint
+    // списка логов сразу окажется в нужной плотности, без видимого
+    // схлопывания после первой пере­рисовки (пункт 6.7 плана улучшений).
+    // Логика по аналогии с темой: синхронный inline в <head>, потому
+    // что <script type="module"> имеет defer-семантику и выполнится
+    // только после парсинга разметки.
+    (function () {
+      try {
+        if (localStorage.getItem('compact-mode') === '1') {
+          document.documentElement.setAttribute('data-compact', 'true');
+        }
+      } catch (e) { /* localStorage может быть недоступен (Safari Private) */ }
+    })();
+  </script>
 </head>
 <body>
   <div class="layout">
@@ -35,6 +50,15 @@
       <label class="append-mode-check">
         <input type="checkbox" id="appendMode">
         <span>Добавить к открытым</span>
+      </label>
+            <!-- Компактный режим отображения (пункт 6.7 плана улучшений).
+           Уменьшает паддинги, шрифт до 11 px и схлопывает столбец
+           сервиса до одной иконки (имя сервиса остаётся в tooltip).
+           Состояние сохраняется в localStorage['compact-mode'] и
+           применяется до рендера inline-скриптом в <head>. -->
+      <label class="compact-mode-check" title="Уменьшить высоту строк, шрифт до 11 px, столбец сервиса — только иконка">
+        <input type="checkbox" id="compactMode">
+        <span>Компактно</span>
       </label>
       <button type="button" class="btn" id="clearAllBtn" style="display: none;">Очистить все</button>
 

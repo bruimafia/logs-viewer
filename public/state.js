@@ -69,6 +69,7 @@ export const dom = {
   sortBy: document.getElementById('sortBy'),
   servicesFilter: document.getElementById('servicesFilter'),
   appendModeCheckbox: document.getElementById('appendMode'),
+  compactModeCheckbox: document.getElementById('compactMode'),
   clearAllBtn: document.getElementById('clearAllBtn'),
   openRemoteBtn: document.getElementById('openRemoteBtn'),
   remoteModal: document.getElementById('remoteModal'),

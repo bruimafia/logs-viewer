@@ -197,6 +197,52 @@ dom.themeToggleBtn.addEventListener('click', () => {
 
 applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
 
+// ====================== Компактный режим (пункт 6.7) ======================
+//
+// Состояние режима хранится в localStorage['compact-mode'] и продублировано
+// в атрибуте data-compact="true" на <html>. Атрибут используется CSS —
+// см. блок «Компактный режим отображения» в public/styles.css.
+//
+// Первичная установка атрибута происходит синхронным inline-скриптом в
+// <head> — это исключает «прыжок» геометрии списка после первой
+// перерисовки (та же логика, что и у data-theme).
+ 
+/**
+ * Применяет компактный режим: ставит/снимает data-compact на <html>,
+ * сохраняет состояние в localStorage и подстраивает title чекбокса.
+ *
+ * @param {boolean} on
+ */
+function applyCompactMode(on) {
+  if (on) {
+    document.documentElement.setAttribute('data-compact', 'true');
+  } else {
+    document.documentElement.removeAttribute('data-compact');
+  }
+  try {
+    localStorage.setItem('compact-mode', on ? '1' : '0');
+  } catch (e) { /* localStorage может быть недоступен (Safari Private) */ }
+ 
+  if (dom.compactModeCheckbox) {
+    dom.compactModeCheckbox.title = on
+      ? 'Выключить компактный режим (вернуть обычные строки)'
+      : 'Уменьшить высоту строк, шрифт до 11 px, столбец сервиса — только иконка';
+  }
+}
+ 
+if (dom.compactModeCheckbox) {
+  // Начальное состояние чекбокса синхронизируем с тем, что inline-скрипт
+  // в <head> уже выставил на <html>. Это однонаправленная синхронизация:
+  // DOM-атрибут — источник правды на момент загрузки.
+  const initiallyOn = document.documentElement.getAttribute('data-compact') === 'true';
+  dom.compactModeCheckbox.checked = initiallyOn;
+  applyCompactMode(initiallyOn);  // только для проставления title
+ 
+  dom.compactModeCheckbox.addEventListener('change', (e) => {
+    applyCompactMode(e.target.checked);
+  });
+}
+
 // ====================== Старт ======================
 
 render();
