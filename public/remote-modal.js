@@ -117,8 +117,19 @@ function renderRemoteConfig() {
         <label>От: <input type="datetime-local" id="remoteDateFrom" step="1"></label>
         <label>До: <input type="datetime-local" id="remoteDateTo" step="1"></label>
       </div>
+      <div class="mode-config-row level-filter-remote">
+        <span class="mode-config-label" style="margin-bottom: 4px;">Уровни (фильтрация на сервере, пункт 5.2):</span>
+        <div class="remote-level-checks">
+          <label class="remote-level-check"><input type="checkbox" id="remoteLevelError" value="ERROR" checked> ERROR</label>
+          <label class="remote-level-check"><input type="checkbox" id="remoteLevelWarn" value="WARN" checked> WARN</label>
+          <label class="remote-level-check"><input type="checkbox" id="remoteLevelInfo" value="INFO" checked> INFO</label>
+          <label class="remote-level-check"><input type="checkbox" id="remoteLevelDebug" value="DEBUG" checked> DEBUG</label>
+        </div>
+      </div>
       <div class="mode-hint">
-        Файл скачивается полностью через SFTP с фильтрацией на сервере. Подходит для исторических периодов.
+        Серверная фильтрация по уровню (<code>grep -E '"level":"(ERROR|WARN)"'</code>)
+        выполняется ДО загрузки по SFTP — экономит трафик на больших файлах.
+        Также работает с фильтром «Содержит» выше.
       </div>
     </div>
 

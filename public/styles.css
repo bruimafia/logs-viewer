@@ -1720,6 +1720,32 @@ mark.search-match {
   font-size: 10px;
 }
 
+/* Фильтр уровней в модалке «Диапазон дат» (пункт 5.2).
+   Стили аналогичны .level-filter в toolbar, но адаптированы под
+   .mode-config-row и @media модалки. */
+.remote-level-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+}
+.remote-level-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.remote-level-check input { accent-color: var(--info); cursor: pointer; }
+
+/* Состояния чекбоксов уровней: подсвечиваем текст и рамку
+   при :has(input:checked), аналогично .error-alert-toggle. */
+.remote-level-check:has(input:checked) {
+  color: var(--info);
+}
+
 /* ============================================================
  * Применяется только внутри .log-extra pre — там, где
  * render.js вставляет результат highlightJson(JSON.stringify(...)).
