@@ -1,0 +1,99 @@
+# ==================== Dependencies ====================
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnpm-store/
+
+# ==================== Build & Distribution ====================
+dist/
+build/
+out/
+.next/
+.nuxt/
+coverage/
+.turbo/
+
+# ==================== Environment Variables ====================
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+!.env.sample
+
+# ==================== IDE - VSCode ====================
+.vscode/
+*.code-workspace
+.history/
+.vscode-test
+
+# ==================== IDE - IntelliJ ====================
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ==================== IDE - General ====================
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.netbeans/
+
+# ==================== Logs ====================
+logs/
+*.log
+npm-debug.log*
+npm-debug.log
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ==================== Runtime ====================
+.cache/
+.eslintcache
+.stylelintcache
+tmp/
+temp/
+
+# ==================== OS ====================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+.windows-build-tools/
+
+# ==================== Testing ====================
+.nyc_output/
+.jest_cache/
+.mocha_output/
+test-results/
+junit.xml
+
+# ==================== Package Manager ====================
+.npm/
+.yarn/
+.eslintignore
+
+# ==================== Misc ====================
+*.bak
+*.swp
+.bundle
+vendor/
+.venv
