@@ -318,11 +318,27 @@ export function serviceIcon(serviceKey) {
 /**
  * Форматирует unix-миллисекунды в локализованную строку даты-времени.
  * В тестах вызывается с известным TZ, поэтому возвращаемый формат стабилен.
+ *
+ * @param {?number} ms
+ * @param {null|number} [tzOffsetMinutes]
+ *   null  → браузерный локальный пояс (поведение по умолчанию);
+ *   число → фиксированное смещение от UTC в минутах
+ *           (0 = UTC, 180 = UTC+03:00, -300 = UTC−05:00).
+ * @returns {string}
  */
-export function formatTime(ms) {
+export function formatTime(ms, tzOffsetMinutes) {
   if (!ms) return '—';
-  const d = new Date(ms);
-  return d.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'medium', hour12: false });
+  if (tzOffsetMinutes == null) {
+    // Локальный пояс — исходное поведение.
+    return new Date(ms).toLocaleString('ru-RU', {
+      dateStyle: 'short', timeStyle: 'medium', hour12: false
+    });
+  }
+  // Фиксированное смещение: сдвигаем ms на offset и форматируем как UTC.
+  const shifted = new Date(ms + tzOffsetMinutes * 60_000);
+  return shifted.toLocaleString('ru-RU', {
+    timeZone: 'UTC', dateStyle: 'short', timeStyle: 'medium', hour12: false
+  });
 }
 
 /**
@@ -526,7 +542,7 @@ export function msToDatetimeLocalValue(ms) {
 /**
  * Возвращает многострочную человекочитаемую полную форму временной метки —
  * предназначена для атрибута `title` (нативный tooltip) на колонке с временем
- * в строке лога. Пункт 6.3 плана улучшений.
+ * в строке лога. Пункты 6.3 и 6.4 плана улучшений.
  *
  * Формат — 4 строки:
  *   понедельник, 15 января 2024 г.
@@ -534,49 +550,69 @@ export function msToDatetimeLocalValue(ms) {
  *   ISO: 2024-01-15T07:30:45.123Z
  *   5 минут назад
  *
- * Если ms некорректен/нулевой — возвращает пустую строку. Это позволяет
- * вызывающему коду не выставлять `title` для записей без времени
- * (`formatTime` в этом случае рисует прочерк, подсказка не нужна).
+ * Если ms некорректен/нулевой — возвращает пустую строку.
  *
  * @param {?number} ms
  * @param {?number} [nowMs] — момент «сейчас» для относительного времени.
  *   В тестах фиксируется; в проде по умолчанию `Date.now()`.
+ * @param {null|number} [tzOffsetMinutes]
+ *   null  → браузерный локальный пояс (поведение по умолчанию);
+ *   число → фиксированное смещение от UTC в минутах.
  * @returns {string}
  */
-export function formatTimeFull(ms, nowMs) {
+export function formatTimeFull(ms, nowMs, tzOffsetMinutes) {
   if (ms == null || !Number.isFinite(ms) || ms === 0) return '';
   const d = new Date(ms);
   if (Number.isNaN(d.getTime())) return '';
-
-  // День недели + полная дата на русском. Используем явные компоненты,
-  // а не dateStyle: 'full' — так формат стабилен и не зависит от того,
-  // как пользователь переопределил locale-настройки в ОС.
-  const dateStr = d.toLocaleString('ru-RU', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
-
-  // Время с миллисекундами и смещением TZ — собираем сами, чтобы не
-  // зависеть от locale-форматов (которые могут вставлять U+202F / NBSP
-  // и ломать копипасту из подсказки).
+ 
+  // День недели + полная дата + время с миллисекундами и смещением TZ.
+  // Поведение зависит от tzOffsetMinutes:
+  //   null  → локальный пояс браузера (исходное поведение — пункт 6.3);
+  //   число → фиксированное смещение: сдвигаем ms, читаем UTC-методами.
   const pad = (n, w = 2) => String(n).padStart(w, '0');
-  const hh  = pad(d.getHours());
-  const mm  = pad(d.getMinutes());
-  const ss  = pad(d.getSeconds());
-  const mss = pad(d.getMilliseconds(), 3);
-  // getTimezoneOffset() возвращает минуты с обратным знаком:
-  // для UTC+3 → -180. Поэтому инвертируем.
-  const tzMin  = -d.getTimezoneOffset();
-  const tzSign = tzMin >= 0 ? '+' : '-';
-  const tzAbs  = Math.abs(tzMin);
-  const tzStr  = `UTC${tzSign}${pad(Math.floor(tzAbs / 60))}:${pad(tzAbs % 60)}`;
+ 
+  let dateStr, hh, mm, ss, mss, tzStr;
+ 
+  if (tzOffsetMinutes == null) {
+    // ——— Локальный пояс (исходное поведение) ———
+    // Используем явные компоненты, а не dateStyle: 'full' — так формат
+    // стабилен и не зависит от locale-настроек ОС.
+    dateStr = d.toLocaleString('ru-RU', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+    hh  = pad(d.getHours());
+    mm  = pad(d.getMinutes());
+    ss  = pad(d.getSeconds());
+    mss = pad(d.getMilliseconds(), 3);
+    // getTimezoneOffset() возвращает минуты с обратным знаком:
+    // для UTC+3 → -180. Поэтому инвертируем.
+    const tzMin  = -d.getTimezoneOffset();
+    const tzSign = tzMin >= 0 ? '+' : '-';
+    const tzAbs  = Math.abs(tzMin);
+    tzStr = `UTC${tzSign}${pad(Math.floor(tzAbs / 60))}:${pad(tzAbs % 60)}`;
+  } else {
+    // ——— Фиксированное смещение (пункт 6.4) ———
+    // Сдвигаем ms на offset и считываем компоненты через UTC-методы.
+    // Так мы не зависим от браузерного TZ вообще.
+    const shifted = new Date(ms + tzOffsetMinutes * 60_000);
+    dateStr = shifted.toLocaleString('ru-RU', {
+      timeZone: 'UTC',
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+    hh  = pad(shifted.getUTCHours());
+    mm  = pad(shifted.getUTCMinutes());
+    ss  = pad(shifted.getUTCSeconds());
+    mss = pad(shifted.getUTCMilliseconds(), 3);
+    // tzStr строим из самого смещения (не из браузерного TZ).
+    const sign = tzOffsetMinutes >= 0 ? '+' : '-';
+    const abs  = Math.abs(tzOffsetMinutes);
+    tzStr = `UTC${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+  }
+ 
   const timeStr = `${hh}:${mm}:${ss}.${mss} (${tzStr})`;
-
-  const isoStr = d.toISOString();
-  const rel    = formatRelativeTime(ms, nowMs);
-
+  const isoStr  = d.toISOString();              // ISO всегда в UTC — не меняем
+  const rel     = formatRelativeTime(ms, nowMs); // относительное время не зависит от TZ
+ 
   return rel
     ? `${dateStr}\n${timeStr}\nISO: ${isoStr}\n${rel}`
     : `${dateStr}\n${timeStr}\nISO: ${isoStr}`;

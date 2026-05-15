@@ -29,6 +29,7 @@ import {
 import { toastConfirm } from './toast.js';
 import { attachErrorAlertHandlers } from './error-alerts.js';
 import { attachSparklineHandlers } from './sparkline.js';
+import { attachTzSelectorHandlers } from './tz-selector.js';
 
 // ====================== Загрузка локальных файлов ======================
 
@@ -179,6 +180,7 @@ attachScrollHandler();
 attachTraceBadgeHandler();
 attachErrorAlertHandlers();  // <-- добавили: пункты 3.2 и 3.3
 attachSparklineHandlers();  // <-- пункт 3.4: мини-спарклайн со статистикой
+attachTzSelectorHandlers();  // пункт 6.4: селектор часового пояса
 
 // ====================== Переключение темы ======================
 

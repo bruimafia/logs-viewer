@@ -1788,3 +1788,59 @@ mark.search-match {
 .log-extra pre .json-number  { color: var(--json-number); }
 .log-extra pre .json-boolean { color: var(--json-boolean); font-weight: 500; }
 .log-extra pre .json-null    { color: var(--json-null); font-style: italic; }
+
+/* ====================== Селектор часового пояса (п. 6.4) ====================== */
+
+.tz-selector-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.tz-selector-icon {
+  font-size: 14px;
+  line-height: 1;
+  /* Иконка часов не интерактивна — только визуальный маркер. */
+  pointer-events: none;
+  user-select: none;
+}
+
+.tz-selector {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 22px 3px 7px;
+  cursor: pointer;
+  /* Стрелка-шеврон через SVG в background-image — унифицированный
+     внешний вид в Chrome, Firefox и Safari без кастомного элемента. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  transition: border-color 0.15s, color 0.15s;
+  /* Ограничиваем ширину, чтобы длинные ярлыки типа "UTC−08:00"
+     не распирали шапку. */
+  max-width: 160px;
+}
+
+.tz-selector:hover {
+  border-color: var(--info);
+  color: var(--text);
+}
+
+.tz-selector:focus {
+  outline: 2px solid var(--info);
+  outline-offset: 1px;
+  color: var(--text);
+}
+
+/* В компактном режиме шапка плотнее — немного уменьшаем селектор. */
+:root[data-compact="true"] .tz-selector {
+  font-size: 10px;
+  padding: 2px 20px 2px 6px;
+}

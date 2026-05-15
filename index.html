@@ -91,6 +91,15 @@
         </label>
       </div>
 
+      <!-- Селектор часового пояса (пункт 6.4 плана улучшений).
+           Опции наполняются динамически из tz-selector.js. -->
+      <label class="tz-selector-wrap" title="Часовой пояс отображения временных меток">
+        <span class="tz-selector-icon" aria-hidden="true">🕐</span>
+        <select id="tzSelector" class="tz-selector" aria-label="Часовой пояс">
+          <!-- Заполняется в attachTzSelectorHandlers() -->
+        </select>
+      </label>
+
       <span class="open-files" id="openFilesLabel">Файлы не выбраны</span>
       <span class="stats" id="stats"></span>
       <button type="button" class="btn theme-toggle" id="themeToggle" title="Переключить тему" aria-label="Переключить тему">

@@ -17,6 +17,7 @@ import {
   serviceIcon
 } from './utils.js';
 import { renderSparkline } from './sparkline.js';
+import { getTzOffsetMinutes } from './tz-selector.js';
 
 // ====================== Чипы сервисов ======================
 
@@ -299,6 +300,7 @@ export function render() {
   const wasNearTop = isNearTop();
 
   const fragment = document.createDocumentFragment();
+  const tz = getTzOffsetMinutes();
   list.forEach(entry => {
     const row = document.createElement('div');
     row.className = `log-entry level-${(entry.level || 'INFO').toUpperCase()}`;
@@ -343,9 +345,9 @@ export function render() {
     // время с миллисекундами, таймзона, ISO 8601, «N минут назад». Пункт 6.3.
     // formatTimeFull возвращает '' для нулевого/невалидного времени —
     // тогда атрибут попадёт пустым, и браузер подсказку не покажет.
-    const timeFullTitle = formatTimeFull(entry._timeMs);
+    const timeFullTitle = formatTimeFull(entry._timeMs, undefined, tz);
     row.innerHTML = `
-      <span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs)}</span>
+      <span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs, tz)}</span>
       <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
       <span class="log-service" style="--service-color:${svcColor}" title="Сервис: ${escapeHtml(svc)}"><span class="service-icon" aria-hidden="true">${escapeHtml(svcIcon)}</span><span class="service-label">${escapeHtml(svc)}</span></span>
       <span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>
