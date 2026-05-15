@@ -44,8 +44,8 @@ import { msToDatetimeLocalValue } from './utils.js';
 const DEFAULT_WINDOW_MS = 30 * 60 * 1000;
 
 // Ключи localStorage для запоминания пользовательских настроек.
-const LS_KEY_WINDOW  = 'sparkline:windowMs';
-const LS_KEY_VISIBLE = 'sparkline:visible'; // '0' — скрыт, иначе виден
+const LS_KEY_WINDOW    = 'sparkline:windowMs';
+const LS_KEY_COLLAPSED = 'sparkline:collapsed'; // '1' — свёрнут (видна только шапка), иначе развёрнут
 
 // Целевое количество бинов на канвасе. Делается небольшим и фиксированным,
 // чтобы бары были заметно широкими (по бару легче попасть курсором) и
@@ -281,21 +281,18 @@ export function renderSparkline() {
 function paintNow() {
   if (!dom.sparklineWrap) return;
 
-  // Условия скрытия: данных нет ИЛИ пользователь сам нажал «Скрыть».
+  // Условие полного скрытия — только одно: данных нет. Кнопка «Свернуть»
+  // НЕ должна прятать весь блок, иначе пользователь не сможет добраться
+  // до неё, чтобы развернуть обратно. В свёрнутом состоянии остаётся
+  // узкая шапка с цифрами и кнопкой «Развернуть».
   if (!state.allLogs.length) {
-    dom.sparklineWrap.hidden = true;
-    return;
-  }
-  if (localStorage.getItem(LS_KEY_VISIBLE) === '0') {
     dom.sparklineWrap.hidden = true;
     return;
   }
   dom.sparklineWrap.hidden = false;
 
-  const sized = resizeCanvas();
-  if (!sized) return; // канвас ещё не растянут — попробуем в следующем render()
-  ctx = sized.ctx;
-  palette = readPalette();
+  const collapsed = localStorage.getItem(LS_KEY_COLLAPSED) === '1';
+  dom.sparklineWrap.classList.toggle('collapsed', collapsed);
 
   // Правый край окна:
   //   • в live-режиме — текущее время (окно «едет» вправо);
@@ -312,12 +309,27 @@ function paintNow() {
   }
   const startMs = endMs - windowMs;
 
+  // Считаем бины ВСЕГДА — даже в свёрнутом состоянии, потому что в
+  // шапке отображаются итоговые цифры по уровням. Сама раскладка
+  // бинов нужна для updateStats; биннинг дёшев.
   const { bins, max } = binByLevel(state.allLogs, windowMs, endMs);
   lastBins = bins;
+  updateStats(bins);
+
+  if (collapsed) {
+    // Канвас и ось не нужны — CSS их прячет по классу .collapsed.
+    // Тултип, если он остался от прошлой сессии, тоже убираем.
+    hideTooltip();
+    return;
+  }
+
+  const sized = resizeCanvas();
+  if (!sized) return; // канвас ещё не растянут — попробуем в следующем render()
+  ctx = sized.ctx;
+  palette = readPalette();
 
   paint(bins, max, sized.cssW, sized.cssH);
   updateAxis(startMs, endMs);
-  updateStats(bins);
 }
 
 // ===================== Тултип =====================
@@ -435,17 +447,25 @@ export function attachSparklineHandlers() {
     });
   }
 
-  // 3. Кнопка «Скрыть / Показать».
+  // 3. Кнопка «Свернуть / Развернуть».
+  //    Намеренно НЕ прячем всю секцию: пользователь должен иметь
+  //    возможность развернуть её обратно, поэтому шапка с кнопкой
+  //    остаётся видимой и в свёрнутом состоянии.
   if (dom.sparklineToggle) {
-    const initiallyHidden = localStorage.getItem(LS_KEY_VISIBLE) === '0';
-    dom.sparklineToggle.setAttribute('aria-pressed', initiallyHidden ? 'false' : 'true');
-    dom.sparklineToggle.textContent = initiallyHidden ? 'Показать' : 'Скрыть';
+    const setButtonState = (collapsed) => {
+      dom.sparklineToggle.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+      dom.sparklineToggle.setAttribute(
+        'aria-label',
+        collapsed ? 'Развернуть спарклайн' : 'Свернуть спарклайн'
+      );
+      dom.sparklineToggle.textContent = collapsed ? 'Развернуть' : 'Свернуть';
+    };
+    setButtonState(localStorage.getItem(LS_KEY_COLLAPSED) === '1');
     dom.sparklineToggle.addEventListener('click', () => {
-      const currentlyHidden = localStorage.getItem(LS_KEY_VISIBLE) === '0';
-      const nextHidden = !currentlyHidden;
-      try { localStorage.setItem(LS_KEY_VISIBLE, nextHidden ? '0' : '1'); } catch (e) {}
-      dom.sparklineToggle.setAttribute('aria-pressed', nextHidden ? 'false' : 'true');
-      dom.sparklineToggle.textContent = nextHidden ? 'Показать' : 'Скрыть';
+      const currentlyCollapsed = localStorage.getItem(LS_KEY_COLLAPSED) === '1';
+      const next = !currentlyCollapsed;
+      try { localStorage.setItem(LS_KEY_COLLAPSED, next ? '1' : '0'); } catch (e) {}
+      setButtonState(next);
       renderSparkline();
     });
   }
