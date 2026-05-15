@@ -70,6 +70,31 @@ function buildGrepPrefix(pattern, options = {}) {
 }
 
 /**
+ * Разбирает logLevels из тела HTTP-запроса (пункт 5.2).
+ * Принимает body.logLevels — массив строк уровней ['ERROR','WARN'].
+ * Возвращает { prefix, hasFilter }:
+ *   prefix    — готовая часть grep-команды, либо null
+ *   hasFilter — true, если задан непустой массив
+ *
+ *   options.regex            — true → -E, false → -F
+ *   options.caseInsensitive  — true → -i
+ */
+function buildLogLevelsPrefix(levels, options = {}) {
+  if (!Array.isArray(levels) || levels.length === 0) return { prefix: null, hasFilter: false };
+  // Экранируем каждый уровень отдельно — вдруг имя содержит спецсимволы.
+  const escaped = levels.map(l => shellEscape(String(l).trim())).join('|');
+  const flags = ['-a', options.regex ? '-E' : '-F'];
+  if (options.caseInsensitive) flags.push('-i');
+  // Каждый уровень может встретиться в формате "level":"ERROR" или "level":"ERROR",
+  // используем ERE с группировкой для надёжности.
+  const pattern = `"level":"(${escaped})"`;
+  return {
+    prefix: `grep ${flags.join(' ')} -e ${shellEscape(pattern)}`,
+    hasFilter: true
+  };
+}
+
+/**
  * Разбирает grep-опции из тела HTTP-запроса. Принимает:
  *   body.grepPattern         (string)  — паттерн поиска
  *   body.grepRegex           (boolean) — использовать ERE вместо литерала
@@ -529,11 +554,134 @@ async function streamFileViaGrep({ res, sendEvent, server, file, grepPrefix, fro
   }
 }
 
+/**
+ * Реализация Range-режима при фильтре по уровням (пункт 5.2).
+ * Через SSH exec делаем grep по уровням, затем применяем фильтр по дате
+ * (date-фильтр JSON-aware, grep его подменить не может).
+ *
+ * Фильтрация по уровню происходит на сервере через `grep -E`,
+ * что позволяет не тащить миллионы строк INFO по сети.
+ *
+ * Прогресс-бар индетерминантный (grep уже отфильтровал), передаём
+ * объём уже-найденных байт.
+ */
+async function streamFileViaLevelFilter({ res, sendEvent, server, file, logLevels, fromMs, toMs }) {
+  const hasDateFilter = fromMs != null || toMs != null;
+
+  const { prefix, hasFilter } = buildLogLevelsPrefix(logLevels, { regex: true, caseInsensitive: false });
+  if (!hasFilter) {
+    // Уровни не заданы — отдаём пустой результат.
+    sendEvent('start', {
+      fileName: path.basename(file.remotePath),
+      filePath: file.remotePath,
+      serverName: server.name,
+      totalBytes: 0,
+      levelFilter: true
+    });
+    sendEvent('complete', { totalLines: 0, bytesLoaded: 0 });
+    return res.end();
+  }
+
+  const filePath = shellEscape(file.remotePath);
+  const cmd = `${prefix} ${filePath}`;
+
+  let stream;
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    if (stream) try { stream.close(); } catch (e) {}
+  };
+
+  try {
+    sendEvent('start', {
+      fileName: path.basename(file.remotePath),
+      filePath: file.remotePath,
+      serverName: server.name,
+      totalBytes: 0,
+      levelFilter: true
+    });
+
+    const pool = getSshPool(server);
+    stream = await pool.exec(cmd);
+
+    let buffer = '';
+    let lineCount = 0;
+    let bytesLoaded = 0;
+    let stderrAcc = '';
+
+    stream.on('data', (chunk) => {
+      bytesLoaded += chunk.length;
+      buffer += chunk.toString('utf-8');
+      const parts = buffer.split('\n');
+      buffer = parts.pop();
+
+      if (parts.length > 0) {
+        const toSend = hasDateFilter
+          ? parts.filter(line => {
+              const t = getLogTimeMs(line);
+              if (fromMs != null && t < fromMs) return false;
+              if (toMs != null && t > toMs) return false;
+              return true;
+            })
+          : parts;
+        if (toSend.length > 0) {
+          lineCount += toSend.length;
+          sendEvent('lines', { lines: toSend });
+        }
+        sendEvent('progress', { bytesLoaded });
+      }
+    });
+
+    stream.stderr.on('data', (chunk) => {
+      stderrAcc += chunk.toString('utf-8');
+    });
+
+    stream.on('close', (code) => {
+      if (buffer.length > 0) {
+        let toSend = [buffer];
+        if (hasDateFilter) {
+          const t = getLogTimeMs(buffer);
+          const inRange = (fromMs == null || t >= fromMs) && (toMs == null || t <= toMs);
+          toSend = inRange ? [buffer] : [];
+        }
+        if (toSend.length > 0) {
+          lineCount += toSend.length;
+          sendEvent('lines', { lines: toSend });
+        }
+      }
+      const stderrText = stderrAcc.trim();
+      const isError = stderrText && code !== 1;
+      if (isError) {
+        sendEvent('error', { message: stderrText || `Exit code ${code}` });
+      } else {
+        sendEvent('complete', { totalLines: lineCount, bytesLoaded });
+      }
+      cleanup();
+      res.end();
+    });
+
+    stream.on('error', (err) => {
+      sendEvent('error', { message: err.message });
+      cleanup();
+      res.end();
+    });
+
+    res.on('close', cleanup);
+
+  } catch (err) {
+    sendEvent('error', { message: err.message });
+    cleanup();
+    res.end();
+  }
+}
+
 app.post('/api/stream-file', async (req, res) => {
-  const { serverId, fileId, dateFrom, dateTo } = req.body;
+  const { serverId, fileId, dateFrom, dateTo, logLevels } = req.body;
   const fromMs = dateFrom ? new Date(dateFrom).getTime() : null;
   const toMs = dateTo ? new Date(dateTo).getTime() : null;
   const hasDateFilter = fromMs != null || toMs != null;
+  const hasLevelFilter = Array.isArray(logLevels) && logLevels.length > 0;
 
   const found = findServerAndFile(serverId, fileId);
   if (found.error) return res.status(404).json({ error: found.error });
@@ -550,6 +698,11 @@ app.post('/api/stream-file', async (req, res) => {
 
   if (hasGrep) {
     return streamFileViaGrep({ res, sendEvent, server, file, grepPrefix, fromMs, toMs });
+  }
+
+  // --- SFTP-ветка: при фильтре по уровню переключаемся на SSH exec-grep ---
+  if (hasLevelFilter) {
+    return streamFileViaLevelFilter({ res, sendEvent, server, file, logLevels, fromMs, toMs });
   }
 
   // --- Старая ветка через SFTP, без изменений ---

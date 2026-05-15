@@ -129,6 +129,23 @@ function getGrepOptions() {
   };
 }
 
+/**
+ * Читает фильтр по уровням из модалки (пункт 5.2).
+ * Возвращает массив выбранных уровней или пустой массив,
+ * если все сняты (сервер примет пустой массив и вернёт все уровни).
+ *
+ * @returns {string[]}
+ */
+function getLogLevels() {
+  const levelIds = ['remoteLevelError', 'remoteLevelWarn', 'remoteLevelInfo', 'remoteLevelDebug'];
+  const levels = [];
+  for (const id of levelIds) {
+    const el = document.getElementById(id);
+    if (el && el.checked) levels.push(el.value);
+  }
+  return levels;
+}
+
 // ====================== Режим 1: Tail с пагинацией ======================
 
 export async function loadTailMode(filesToLoad) {
@@ -267,9 +284,12 @@ export async function loadRangeMode(filesToLoad) {
     dateTo: dateToEl?.value || null
   };
   const grepOptions = getGrepOptions();
+  const logLevels = getLogLevels();
 
   const progressContainer = createProgressContainer();
   const isAppend = dom.appendModeCheckbox.checked;
+  let isGrepMode = false;
+  let isLevelFilterMode = false;
 
   if (!isAppend) {
     stopAllLive();
@@ -290,22 +310,24 @@ export async function loadRangeMode(filesToLoad) {
         fileId: fileInfo.fileId,
         dateFrom: dateRange.dateFrom,
         dateTo: dateRange.dateTo,
+        logLevels,
         ...grepOptions
       }, {
         start: (data) => {
           totalBytes = data.totalBytes || 0;
           isGrepMode = !!data.grepFilter;
-          if (isGrepMode) {
-            // В grep-режиме реальный размер источника неизвестен,
+          isLevelFilterMode = !!data.levelFilter;
+          if (isGrepMode || isLevelFilterMode) {
+            // В режиме серверного фильтра реальный размер источника неизвестен,
             // показываем индетерминантный прогресс.
-            updateProgress(progressContainer, displayName, 'Серверный поиск...', null, true);
+            updateProgress(progressContainer, displayName, 'Серверная фильтрация...', null, true);
           } else {
             updateProgress(progressContainer, displayName, 'Загрузка...', 0, false, `0 / ${formatBytes(totalBytes)}`);
           }
         },
         progress: (data) => {
-          if (isGrepMode) {
-            updateProgress(progressContainer, displayName, 'Серверный поиск...', null, true,
+          if (isGrepMode || isLevelFilterMode) {
+            updateProgress(progressContainer, displayName, 'Серверная фильтрация...', null, true,
               `Найдено: ${formatBytes(data.bytesLoaded || 0)}`);
           } else {
             updateProgress(progressContainer, displayName, 'Загрузка...', data.percent, false,
