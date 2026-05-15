@@ -263,6 +263,10 @@ export function render() {
   maybeRebuildChips();
   // Обновляем баннер активной трассы.
   updateTraceFilterBanner();
+  // Обновляем мини-спарклайн (пункт 3.4). Дроссель через rAF — несколько
+  // вызовов подряд при live-batch + render схлопнутся в один кадр.
+  renderSparkline();
+
   // Считываем поисковую строку один раз — она используется и в фильтре,
   // и для подсветки совпадений в результатах.
   const search = dom.searchInput.value.trim();
@@ -369,10 +373,6 @@ export function render() {
       dom.logListWrap.scrollTop = 0;
     }
   }
-
-  // Обновляем мини-спарклайн (пункт 3.4). Дроссель через rAF — несколько
-  // вызовов подряд при live-batch + render схлопнутся в один кадр.
-  renderSparkline();
 }
 
 export function scheduleRender() {
