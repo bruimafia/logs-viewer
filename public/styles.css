@@ -653,6 +653,75 @@ mark.search-match {
   line-height: 1.5;
 }
 
+/* Серверный grep (пункт 5.3): общий блок «Содержит» располагается между
+   селектором режима и mode-specific конфигом. Визуально отделяем тонкой
+   границей сверху, чтобы было ясно — это поле общее. */
+.mode-config-shared {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+/* Строка с текстовым полем и чекбоксами рядом. */
+.mode-config-row-grep {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mode-config-row-grep input[type="text"] {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.mode-config-row-grep input[type="text"]:focus {
+  outline: none;
+  border-color: var(--info);
+}
+
+.grep-flag-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.grep-flag-label:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.grep-flag-label input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Состояние "включено" даём не через :has (не везде поддерживается),
+   а через JS — но даже без него галочка явно видна. Если нужно
+   подсвечивать активный чекбокс, добавьте :has-вариант:
+   .grep-flag-label:has(input:checked) { color: var(--info); border-color: var(--info); }
+   Современные Chrome/Firefox/Safari (2023+) это поддерживают. */
+.grep-flag-label:has(input:checked) {
+  color: var(--info);
+  border-color: var(--info);
+}
+
 /* === Список серверов === */
 .server-section {
   margin-bottom: 12px;

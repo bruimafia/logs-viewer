@@ -74,6 +74,31 @@ function renderRemoteConfig() {
       </label>
     </div>
 
+    <!-- Серверный поиск (пункт 5.3) — общее поле для режимов «Хвост» и «Диапазон» -->
+    <div class="mode-config mode-config-shared" id="config-shared-grep">
+      <span class="mode-config-label">Содержит (опционально) — серверный grep до загрузки</span>
+      <div class="mode-config-row mode-config-row-grep">
+        <input type="text" id="remoteGrepPattern"
+               placeholder="напр.: ERROR, traceId=abc123, /timeout|deadline/"
+               autocomplete="off"
+               spellcheck="false">
+        <label class="grep-flag-label" title="Использовать регулярное выражение (ERE: . * + ? ( ) | [ ] { } ^ $ \\)">
+          <input type="checkbox" id="remoteGrepRegex">
+          <span>.* regex</span>
+        </label>
+        <label class="grep-flag-label" title="Игнорировать регистр (-i)">
+          <input type="checkbox" id="remoteGrepCaseInsensitive" checked>
+          <span>Aa</span>
+        </label>
+      </div>
+      <div class="mode-hint">
+        Фильтрация выполняется на сервере (<code>grep</code>) ДО <code>tail</code>
+        в режиме «Хвост» и вместо SFTP-чтения всего файла в режиме «Диапазон».
+        Радикально ускоряет работу с большими файлами.
+        В режиме «Хвост» это «последние N <em>совпавших</em> строк».
+      </div>
+    </div>
+
     <!-- Конфигурация: Хвост -->
     <div class="mode-config" id="config-tail">
       <span class="mode-config-label">Загрузить N последних строк (быстро, через tail)</span>
@@ -176,6 +201,11 @@ function setLoadMode(mode) {
     live: 'Запустить Live'
   };
   dom.loadRemoteBtn.textContent = btnTexts[mode];
+
+  // Серверный grep (пункт 5.3) применим только к Tail и Range.
+  // В Live прячем поле, чтобы пользователь не подумал, что оно тут работает.
+  const sharedGrepEl = document.getElementById('config-shared-grep');
+  if (sharedGrepEl) sharedGrepEl.style.display = (mode === 'live') ? 'none' : '';
 }
 
 // ====================== Глобальные функции для inline-обработчиков ======================

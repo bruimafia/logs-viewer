@@ -106,10 +106,34 @@ export function updateProgress(container, fileName, status, percent, indetermina
   }
 }
 
+/**
+ * Читает опции серверного grep-фильтра из модалки (пункт 5.3).
+ * Возвращает объект с полями grepPattern/grepRegex/grepCaseInsensitive,
+ * готовый для подмешивания в тело SSE-запроса через spread.
+ *
+ * Если поле паттерна пустое — возвращает пустой объект, и тогда сервер
+ * не получит grep-полей и пойдёт по старому пути без фильтрации.
+ *
+ * @returns {{grepPattern?: string, grepRegex?: boolean, grepCaseInsensitive?: boolean}}
+ */
+function getGrepOptions() {
+  const patternEl = document.getElementById('remoteGrepPattern');
+  const pattern = patternEl ? patternEl.value.trim() : '';
+  if (!pattern) return {};
+  const regexEl = document.getElementById('remoteGrepRegex');
+  const caseEl = document.getElementById('remoteGrepCaseInsensitive');
+  return {
+    grepPattern: pattern,
+    grepRegex: !!(regexEl && regexEl.checked),
+    grepCaseInsensitive: !!(caseEl && caseEl.checked)
+  };
+}
+
 // ====================== Режим 1: Tail с пагинацией ======================
 
 export async function loadTailMode(filesToLoad) {
   const linesNum = parseInt(document.getElementById('tailLines').value) || 1000;
+  const grepOptions = getGrepOptions();
   const progressContainer = createProgressContainer();
   const isAppend = dom.appendModeCheckbox.checked;
 
@@ -133,7 +157,8 @@ export async function loadTailMode(filesToLoad) {
         serverId: fileInfo.serverId,
         fileId: fileInfo.fileId,
         lines: linesNum,
-        offsetLines: 0
+        offsetLines: 0,
+        ...grepOptions 
       }, {
         start: (data) => {
           updateProgress(progressContainer, displayName, `Чтение последних ${data.lines} строк...`, null, true);
@@ -157,7 +182,8 @@ export async function loadTailMode(filesToLoad) {
         file: fileInfo.file,
         currentOffset: linesNum,
         pageSize: linesNum,
-        totalLoaded: added
+        totalLoaded: added,
+        grepOptions
       });
       successCount++;
     } catch (err) {
@@ -195,7 +221,8 @@ export async function loadMorePages() {
         serverId: pf.serverId,
         fileId: pf.fileId,
         lines: pf.pageSize,
-        offsetLines: pf.currentOffset
+        offsetLines: pf.currentOffset,
+        ...(pf.grepOptions || {})
       }, {
         start: () => {},
         lines: (data) => {
@@ -239,6 +266,7 @@ export async function loadRangeMode(filesToLoad) {
     dateFrom: dateFromEl?.value || null,
     dateTo: dateToEl?.value || null
   };
+  const grepOptions = getGrepOptions();
 
   const progressContainer = createProgressContainer();
   const isAppend = dom.appendModeCheckbox.checked;
@@ -261,15 +289,28 @@ export async function loadRangeMode(filesToLoad) {
         serverId: fileInfo.serverId,
         fileId: fileInfo.fileId,
         dateFrom: dateRange.dateFrom,
-        dateTo: dateRange.dateTo
+        dateTo: dateRange.dateTo,
+        ...grepOptions
       }, {
         start: (data) => {
           totalBytes = data.totalBytes || 0;
-          updateProgress(progressContainer, displayName, 'Загрузка...', 0, false, `0 / ${formatBytes(totalBytes)}`);
+          isGrepMode = !!data.grepFilter;
+          if (isGrepMode) {
+            // В grep-режиме реальный размер источника неизвестен,
+            // показываем индетерминантный прогресс.
+            updateProgress(progressContainer, displayName, 'Серверный поиск...', null, true);
+          } else {
+            updateProgress(progressContainer, displayName, 'Загрузка...', 0, false, `0 / ${formatBytes(totalBytes)}`);
+          }
         },
         progress: (data) => {
-          updateProgress(progressContainer, displayName, 'Загрузка...', data.percent, false,
-            `${formatBytes(data.bytesLoaded)} / ${formatBytes(data.totalBytes)}`);
+          if (isGrepMode) {
+            updateProgress(progressContainer, displayName, 'Серверный поиск...', null, true,
+              `Найдено: ${formatBytes(data.bytesLoaded || 0)}`);
+          } else {
+            updateProgress(progressContainer, displayName, 'Загрузка...', data.percent, false,
+              `${formatBytes(data.bytesLoaded)} / ${formatBytes(data.totalBytes)}`);
+          }
         },
         lines: (data) => {
           for (const l of data.lines) collectedLines.push(l);

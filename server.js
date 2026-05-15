@@ -47,6 +47,50 @@ function shellEscape(s) {
   return "'" + String(s).replace(/'/g, "'\\''") + "'";
 }
 
+/**
+ * Строит prefix-команду grep'а для серверного поиска (пункт 5.3 плана улучшений).
+ * Возвращает строку вида `grep -a -F -i -e 'pattern'` или null, если pattern пуст.
+ *
+ *   options.regex            — true → -E (ERE: . * + ? ( ) | [ ] { } ^ $ \),
+ *                              false → -F (fixed string, литерал — безопасно по умолчанию)
+ *   options.caseInsensitive  — true → -i (игнорировать регистр)
+ *
+ * Флаг `-a` (treat binary as text) включён всегда — иначе на логах с NUL-байтами
+ * grep печатает "Binary file ... matches" вместо строк.
+ *
+ * Pattern экранируется через shellEscape. Ключ `-e` критичен: без него pattern,
+ * начинающийся с `-` (например, `-v`), будет проинтерпретирован как флаг grep.
+ */
+function buildGrepPrefix(pattern, options = {}) {
+  if (!pattern || typeof pattern !== 'string') return null;
+  const flags = ['-a'];
+  flags.push(options.regex ? '-E' : '-F');
+  if (options.caseInsensitive) flags.push('-i');
+  return `grep ${flags.join(' ')} -e ${shellEscape(pattern)}`;
+}
+
+/**
+ * Разбирает grep-опции из тела HTTP-запроса. Принимает:
+ *   body.grepPattern         (string)  — паттерн поиска
+ *   body.grepRegex           (boolean) — использовать ERE вместо литерала
+ *   body.grepCaseInsensitive (boolean) — игнорировать регистр
+ *
+ * Возвращает { prefix, hasFilter }:
+ *   prefix    — готовая строка для подстановки в команду, либо null
+ *   hasFilter — true, если задан непустой паттерн
+ */
+function parseGrepFilter(body) {
+  const pattern = typeof body?.grepPattern === 'string' ? body.grepPattern.trim() : '';
+  if (!pattern) return { prefix: null, hasFilter: false };
+  return {
+    prefix: buildGrepPrefix(pattern, {
+      regex: !!body.grepRegex,
+      caseInsensitive: !!body.grepCaseInsensitive
+    }),
+    hasFilter: true
+  };
+}
+
 // ====================== Пул SSH-соединений ======================
 // Live-стриминг и tail запускают exec-команды по SSH. Чтобы не упираться
 // в лимиты sshd (MaxStartups, MaxSessions) при параллельных потоках,
@@ -372,6 +416,119 @@ app.post('/api/test-connection', async (req, res) => {
 // ====================== API: загрузка целиком (с фильтром по дате) ======================
 // Используется для режима "По диапазону дат"
 
+/**
+ * Реализация Range-режима при включённом серверном grep (пункт 5.3):
+ * вместо потокового SFTP-чтения всего файла запускаем `grep ... file`
+ * через SSH exec. По сети передаются только совпавшие строки —
+ * радикальное ускорение на больших файлах.
+ *
+ * Прогресс по байтам источника недоступен (grep уже отфильтровал),
+ * поэтому прогресс-бар индетерминантный; всё, что мы передаём, —
+ * объём УЖЕ-совпавших байт.
+ *
+ * Фильтр по дате остаётся построчным (так же, как в SFTP-ветке) —
+ * date-фильтр JSON-aware, grep его подменить не может.
+ */
+async function streamFileViaGrep({ res, sendEvent, server, file, grepPrefix, fromMs, toMs }) {
+  const hasDateFilter = fromMs != null || toMs != null;
+  const filePath = shellEscape(file.remotePath);
+  const cmd = `${grepPrefix} ${filePath}`;
+
+  let stream;
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    if (stream) try { stream.close(); } catch (e) {}
+  };
+
+  try {
+    sendEvent('start', {
+      fileName: path.basename(file.remotePath),
+      filePath: file.remotePath,
+      serverName: server.name,
+      totalBytes: 0,        // неизвестно — клиент покажет индетерминантный прогресс
+      grepFilter: true
+    });
+
+    const pool = getSshPool(server);
+    stream = await pool.exec(cmd);
+
+    let buffer = '';
+    let lineCount = 0;
+    let bytesLoaded = 0;
+    let stderrAcc = '';
+
+    stream.on('data', (chunk) => {
+      bytesLoaded += chunk.length;
+      buffer += chunk.toString('utf-8');
+      const parts = buffer.split('\n');
+      buffer = parts.pop();
+
+      if (parts.length > 0) {
+        const toSend = hasDateFilter
+          ? parts.filter(line => {
+              const t = getLogTimeMs(line);
+              if (fromMs != null && t < fromMs) return false;
+              if (toMs != null && t > toMs) return false;
+              return true;
+            })
+          : parts;
+        if (toSend.length > 0) {
+          lineCount += toSend.length;
+          sendEvent('lines', { lines: toSend });
+        }
+        // Прогресс по «найденным» байтам — без totalBytes,
+        // клиент должен показать это как indeterminate.
+        sendEvent('progress', { bytesLoaded });
+      }
+    });
+
+    stream.stderr.on('data', (chunk) => {
+      stderrAcc += chunk.toString('utf-8');
+    });
+
+    stream.on('close', (code) => {
+      if (buffer.length > 0) {
+        let toSend = [buffer];
+        if (hasDateFilter) {
+          const t = getLogTimeMs(buffer);
+          const inRange = (fromMs == null || t >= fromMs) && (toMs == null || t <= toMs);
+          toSend = inRange ? [buffer] : [];
+        }
+        if (toSend.length > 0) {
+          lineCount += toSend.length;
+          sendEvent('lines', { lines: toSend });
+        }
+      }
+      const stderrText = stderrAcc.trim();
+      // grep exit 1 = «нет совпадений», это НЕ ошибка (отдадим complete с 0 строк).
+      // grep exit 2 (или произвольный со stderr) = ошибка.
+      const isError = stderrText && code !== 1;
+      if (isError) {
+        sendEvent('error', { message: stderrText || `Exit code ${code}` });
+      } else {
+        sendEvent('complete', { totalLines: lineCount, bytesLoaded });
+      }
+      cleanup();
+      res.end();
+    });
+
+    stream.on('error', (err) => {
+      sendEvent('error', { message: err.message });
+      cleanup();
+      res.end();
+    });
+
+    res.on('close', cleanup);
+
+  } catch (err) {
+    sendEvent('error', { message: err.message });
+    cleanup();
+    res.end();
+  }
+}
+
 app.post('/api/stream-file', async (req, res) => {
   const { serverId, fileId, dateFrom, dateTo } = req.body;
   const fromMs = dateFrom ? new Date(dateFrom).getTime() : null;
@@ -382,8 +539,21 @@ app.post('/api/stream-file', async (req, res) => {
   if (found.error) return res.status(404).json({ error: found.error });
   const { server, file } = found;
 
+  // Серверный grep (пункт 5.3): при заполненном поле «Содержит» уходим
+  // в отдельный путь через SSH exec — это даёт реальную экономию трафика
+  // на больших файлах, т.к. SFTP стянул бы файл целиком, а grep отдаёт
+  // только совпадения.
+  const { prefix: grepPrefix, hasFilter: hasGrep } = parseGrepFilter(req.body);
+
   setSseHeaders(res);
   const sendEvent = makeSseSender(res);
+
+  if (hasGrep) {
+    return streamFileViaGrep({ res, sendEvent, server, file, grepPrefix, fromMs, toMs });
+  }
+
+  // --- Старая ветка через SFTP, без изменений ---
+
   const sftp = new SftpClient();
   let totalBytes = 0;
   let processedBytes = 0;
@@ -483,6 +653,9 @@ app.post('/api/tail-file', async (req, res) => {
   if (found.error) return res.status(404).json({ error: found.error });
   const { server, file } = found;
 
+  // Серверный grep (пункт 5.3): опциональный пре-фильтр перед tail.
+  const { prefix: grepPrefix, hasFilter: hasGrep } = parseGrepFilter(req.body);
+
   setSseHeaders(res);
   const sendEvent = makeSseSender(res);
 
@@ -499,11 +672,21 @@ app.post('/api/tail-file', async (req, res) => {
   try {
     const filePath = shellEscape(file.remotePath);
     const totalLines = linesNum + offsetNum;
-    // tail берёт последние totalLines строк, head обрезает первые linesNum.
-    // Получаем "окно" размером linesNum, начинающееся с offset от конца файла.
-    const cmd = offsetNum === 0
-      ? `tail -n ${linesNum} ${filePath}`
-      : `tail -n ${totalLines} ${filePath} | head -n ${linesNum}`;
+
+    // С grep'ом семантика «последние N СОВПАВШИХ строк» — сначала фильтруем
+    // ВЕСЬ файл, потом берём хвост. Без grep'а — старая команда.
+    // tail берёт последние totalLines строк, head обрезает первые linesNum:
+    // получаем "окно" размером linesNum, начинающееся с offset от конца файла.
+    let cmd;
+    if (grepPrefix) {
+      cmd = offsetNum === 0
+        ? `${grepPrefix} ${filePath} | tail -n ${linesNum}`
+        : `${grepPrefix} ${filePath} | tail -n ${totalLines} | head -n ${linesNum}`;
+    } else {
+      cmd = offsetNum === 0
+        ? `tail -n ${linesNum} ${filePath}`
+        : `tail -n ${totalLines} ${filePath} | head -n ${linesNum}`;
+    }
 
     sendEvent('start', {
       fileName: path.basename(file.remotePath),
@@ -511,7 +694,8 @@ app.post('/api/tail-file', async (req, res) => {
       serverName: server.name,
       lines: linesNum,
       offsetLines: offsetNum,
-      mode: 'tail'
+      mode: 'tail',
+      grepFilter: hasGrep
     });
 
     const pool = getSshPool(server);
@@ -540,8 +724,18 @@ app.post('/api/tail-file', async (req, res) => {
         lineCount += 1;
         sendEvent('lines', { lines: [buffer] });
       }
-      if (code !== 0 && stderrAcc) {
-        sendEvent('error', { message: stderrAcc.trim() || `Exit code ${code}` });
+      const stderrText = stderrAcc.trim();
+      // ТОНКОСТЬ grep-режима:
+      // В пайпе `grep ... | tail -n N` итоговый exit code = exit code tail,
+      // который почти всегда 0, ДАЖЕ если grep упал с "Invalid regular
+      // expression" или "No such file". Без специальной обработки клиент
+      // увидит "complete" с 0 строк и не поймёт, что произошло.
+      // Поэтому: в grep-режиме непустой stderr трактуем как ошибку
+      // независимо от exit code. В обычном tail-режиме оставляем старое
+      // поведение (code !== 0 && stderr).
+      const isError = stderrText && (code !== 0 || hasGrep);
+      if (isError) {
+        sendEvent('error', { message: stderrText || `Exit code ${code}` });
       } else {
         sendEvent('complete', { totalLines: lineCount, exitCode: code });
       }
