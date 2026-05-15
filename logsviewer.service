@@ -1,0 +1,16 @@
+[Unit]
+Description=Logs Viewer Service (Просмотрщик логов)
+
+[Service]
+Type=simple
+WorkingDirectory=/var/logs-viewer
+ExecStart=/usr/bin/npm run start
+
+Restart=on-failure
+RestartSec=5s
+
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
