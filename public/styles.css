@@ -1295,16 +1295,6 @@ mark.search-match {
   border-color: color-mix(in srgb, var(--service-color, var(--text-muted)) 70%, var(--border));
 }
 
-/* Иконка-маркер сервиса. Цвет — насыщенный --service-color (на тинте фона
-   читается, не сливается). Размер и line-height фиксируем, чтобы иконки
-   разной «высоты» (◆ vs ★ vs ●) не дёргали бейслайн в чипе. */
-.service-chip .service-icon,
-.log-service  .service-icon {
-  color: var(--service-color, var(--text-muted));
-  font-size: 12px;
-  line-height: 1;
-  flex-shrink: 0;
-}
 .service-chip .service-label,
 .log-service  .service-label {
   line-height: 1;
@@ -1318,9 +1308,6 @@ mark.search-match {
 .service-chip.hidden {
   background: var(--bg);
   border-color: var(--border);
-  color: var(--text-muted);
-}
-.service-chip.hidden .service-icon {
   color: var(--text-muted);
 }
 
@@ -1357,10 +1344,6 @@ mark.search-match {
     color: var(--text);
     border-color: transparent;
     padding: 2px 8px;
-  }
-  .service-chip .service-icon,
-  .log-service  .service-icon {
-    color: var(--text-muted);
   }
 }
 
@@ -1715,11 +1698,6 @@ mark.search-match {
 }
 :root[data-compact="true"] .log-service .service-label {
   display: none;
-}
-/* Иконка слегка увеличена — в компакте она единственный визуальный
-   маркер сервиса, нельзя терять различимость. */
-:root[data-compact="true"] .log-service .service-icon {
-  font-size: 13px;
 }
  
 /* Раскрытый блок «Доп. поля» в компакте — тоже плотнее.
