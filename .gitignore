@@ -29,6 +29,7 @@ coverage/
 *.code-workspace
 .history/
 .vscode-test
+.cursorignore
 
 # ==================== IDE - IntelliJ ====================
 .idea/
