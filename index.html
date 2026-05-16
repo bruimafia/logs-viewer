@@ -233,8 +233,11 @@
   <div class="modal-overlay" id="remoteModal">
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title">Удаленные файлы</span>
-        <button class="modal-close" id="closeModal">&times;</button>
+        <nav class="modal-tabs" id="remoteModalTabs" aria-label="Разделы модального окна">
+          <button class="modal-tab active" data-tab="files" aria-pressed="true">Выбрать файлы</button>
+          <button class="modal-tab" data-tab="servers" aria-pressed="false">⚙ Серверы</button>
+        </nav>
+        <button class="modal-close" id="closeModal" aria-label="Закрыть">&times;</button>
       </div>
       <div class="modal-body" id="remoteModalBody">
         <!-- Содержимое загружается динамически -->

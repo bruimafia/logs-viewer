@@ -385,9 +385,12 @@ app.get('/api/config', (req, res) => {
 app.post('/api/config', (req, res) => {
   const newConfig = req.body;
   const currentConfig = getConfig();
-  newConfig.servers.forEach((server, index) => {
-    if (server.password === '••••••••' && currentConfig.servers[index]) {
-      server.password = currentConfig.servers[index].password;
+  // Сопоставляем по serverId, а не по индексу — это безопасно при добавлении/удалении серверов.
+  const currentServerMap = new Map(currentConfig.servers.map(s => [s.id, s]));
+  newConfig.servers.forEach(server => {
+    if (server.password === '••••••••') {
+      const currentServer = currentServerMap.get(server.id);
+      if (currentServer) server.password = currentServer.password;
     }
   });
   if (saveConfig(newConfig)) res.json({ success: true });
@@ -422,6 +425,50 @@ app.post('/api/test-connection-by-id', async (req, res) => {
   } catch (err) {
     try { await sftp.end(); } catch (e) {}
     res.json({ success: false, message: err.message });
+  }
+});
+
+// ====================== API: раскрытие glob-паттернов (пункт 7.2) ======================
+
+/**
+ * Раскрывает glob-паттерн в список реальных файлов через SSH exec.
+ * Использует bash для надёжного раскрытия wildcards: * ? [].
+ * Возвращает пустой массив при ошибке или если файлов не найдено.
+ */
+async function expandGlobPattern(server, pattern) {
+  const pool = getSshPool(server);
+  // ls -1d выводит каждый файл на отдельной строке; 2>/dev/null подавляет ошибку «не найдено».
+  const cmd = `bash -c 'ls -1d ${shellEscape(pattern)} 2>/dev/null | sort'`;
+  return new Promise((resolve) => {
+    pool.exec(cmd).then(stream => {
+      let output = '';
+      stream.on('data', chunk => { output += chunk.toString('utf-8'); });
+      stream.stderr?.on('data', () => {});
+      stream.on('close', () => {
+        const files = output.split('\n').map(f => f.trim()).filter(f => f.length > 0);
+        resolve(files);
+      });
+      stream.on('error', () => resolve([]));
+    }).catch(() => resolve([]));
+  });
+}
+
+app.post('/api/expand-glob', async (req, res) => {
+  const { serverId, pattern } = req.body;
+  if (!pattern) return res.json({ files: [], isGlob: false });
+
+  const hasWildcard = /[*?]/.test(pattern);
+  if (!hasWildcard) return res.json({ files: [pattern], isGlob: false });
+
+  const config = getConfig();
+  const server = config.servers.find(s => s.id === serverId);
+  if (!server) return res.status(400).json({ error: 'Сервер не найден' });
+
+  try {
+    const files = await expandGlobPattern(server, pattern);
+    res.json({ files, isGlob: true, pattern });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
