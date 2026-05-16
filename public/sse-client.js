@@ -163,8 +163,11 @@ export async function loadTailMode(filesToLoad) {
   let errorCount = 0;
 
   for (const fileInfo of filesToLoad) {
-    const key = `${fileInfo.serverId}::${fileInfo.fileId}`;
-    const displayName = `[${fileInfo.server.name}] ${fileInfo.file.name}`;
+    // virtualKey уникален для каждой записи в списке (для glob включает индекс
+    // в расширении), а displayName — заранее подготовленное человекочитаемое имя.
+    // Для обычных файлов оба поля могут быть не заданы — тогда используем дефолты.
+    const key = fileInfo.virtualKey || `${fileInfo.serverId}::${fileInfo.fileId}`;
+    const displayName = fileInfo.displayName || `[${fileInfo.server.name}] ${fileInfo.file.name}`;
     const collectedLines = [];
 
     updateProgress(progressContainer, displayName, 'Загрузка хвоста...', null, true);
@@ -175,7 +178,9 @@ export async function loadTailMode(filesToLoad) {
         fileId: fileInfo.fileId,
         lines: linesNum,
         offsetLines: 0,
-        ...grepOptions 
+        // overridePath подставляется на сервере вместо file.remotePath (glob-расширение).
+        overridePath: fileInfo.overridePath || undefined,
+        ...grepOptions
       }, {
         start: (data) => {
           updateProgress(progressContainer, displayName, `Чтение последних ${data.lines} строк...`, null, true);
@@ -197,6 +202,7 @@ export async function loadTailMode(filesToLoad) {
         displayName,
         server: fileInfo.server,
         file: fileInfo.file,
+        overridePath: fileInfo.overridePath || null,
         currentOffset: linesNum,
         pageSize: linesNum,
         totalLoaded: added,
@@ -239,6 +245,8 @@ export async function loadMorePages() {
         fileId: pf.fileId,
         lines: pf.pageSize,
         offsetLines: pf.currentOffset,
+        // overridePath сохраняется при первичной загрузке — нужен для glob-расширения.
+        overridePath: pf.overridePath || undefined,
         ...(pf.grepOptions || {})
       }, {
         start: () => {},
@@ -300,7 +308,9 @@ export async function loadRangeMode(filesToLoad) {
   let errorCount = 0;
 
   for (const fileInfo of filesToLoad) {
-    const displayName = `[${fileInfo.server.name}] ${fileInfo.file.name}`;
+    // displayName приходит готовый из remote-modal (для glob — с автоматическим
+    // именем по пути), иначе строим стандартный «[Server] file.name».
+    const displayName = fileInfo.displayName || `[${fileInfo.server.name}] ${fileInfo.file.name}`;
     const collectedLines = [];
     let totalBytes = 0;
 
@@ -311,6 +321,8 @@ export async function loadRangeMode(filesToLoad) {
         dateFrom: dateRange.dateFrom,
         dateTo: dateRange.dateTo,
         logLevels,
+        // overridePath подставляется на сервере вместо file.remotePath (glob-расширение).
+        overridePath: fileInfo.overridePath || undefined,
         ...grepOptions
       }, {
         start: (data) => {
@@ -499,11 +511,14 @@ export async function startLiveMode(filesToLoad) {
   state.userScrolledAway = false;
 
   // Группируем файлы по serverId — отбрасываем уже стримящиеся.
+  // virtualKey уникален в пределах сеанса (для glob-расширенных файлов включает
+  // индекс), displayName готов для отображения. Для обычных файлов используются
+  // дефолты — поведение совместимо со старым кодом.
   const byServer = new Map();
   for (const fileInfo of filesToLoad) {
-    const key = `${fileInfo.serverId}::${fileInfo.fileId}`;
+    const key = fileInfo.virtualKey || `${fileInfo.serverId}::${fileInfo.fileId}`;
     if (state.liveStreams.has(key)) continue;
-    const displayName = `[${fileInfo.server.name}] ${fileInfo.file.name}`;
+    const displayName = fileInfo.displayName || `[${fileInfo.server.name}] ${fileInfo.file.name}`;
     if (!state.openedFiles.includes(displayName)) state.openedFiles.push(displayName);
 
     addLiveLoadingItem(key, displayName);
@@ -513,7 +528,12 @@ export async function startLiveMode(filesToLoad) {
       bucket = { server: fileInfo.server, files: [] };
       byServer.set(fileInfo.serverId, bucket);
     }
-    bucket.files.push({ fileId: fileInfo.fileId, displayName, key });
+    bucket.files.push({
+      fileId: fileInfo.fileId,
+      displayName,
+      key,
+      overridePath: fileInfo.overridePath || null
+    });
   }
 
   // Запускаем по одному SSE-соединению на сервер
@@ -548,9 +568,13 @@ export async function startLiveMode(filesToLoad) {
 
 async function runLiveGroup(server, files, initialLines, group) {
   const serverId = server.id;
+  // fileState ключуется по f.key (virtualKey) — это уникальный идентификатор
+  // потока в группе. Один fileId может породить несколько потоков (glob),
+  // поэтому ключевание по чистому fileId недостаточно.
   const fileState = new Map();
   for (const f of files) {
-    fileState.set(f.fileId, {
+    fileState.set(f.key, {
+      fileId: f.fileId,
       key: f.key,
       displayName: f.displayName,
       firstLinesReceived: false,
@@ -562,7 +586,15 @@ async function runLiveGroup(server, files, initialLines, group) {
   try {
     await streamSSE('/api/tail-follow-multi', {
       serverId,
-      files: files.map(f => ({ fileId: f.fileId, initialLines }))
+      // На сервере используется fileKey как идентификатор канала (см. server.js).
+      // В SSE-событиях это значение приходит в поле data.fileId, поэтому ниже
+      // мы маппим fileState через data.fileId === f.key.
+      files: files.map(f => ({
+        fileId: f.fileId,
+        fileKey: f.key,
+        initialLines,
+        overridePath: f.overridePath || undefined
+      }))
     }, {
       start: (data) => {
         group.groupId = data.groupId;
@@ -669,7 +701,7 @@ async function runLiveGroup(server, files, initialLines, group) {
 export async function stopLiveStream(key) {
   const stream = state.liveStreams.get(key);
   if (!stream) return;
-  const { group, fileId } = stream;
+  const { group } = stream;
 
   state.liveStreams.delete(key);
   group.fileKeys.delete(key);
@@ -686,10 +718,14 @@ export async function stopLiveStream(key) {
   }
   if (group.groupId) {
     try {
+      // На сервере closers индексируется по fileKey (см. server.js), а fileKey
+      // на стороне клиента равен `key` из state.liveStreams — это и есть
+      // virtualKey файла. Передаём его как fileId — в SSE-эндпоинте это поле
+      // совмещено с fileKey для обратной совместимости.
       await fetch('/api/tail-follow-multi/stop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupId: group.groupId, fileId })
+        body: JSON.stringify({ groupId: group.groupId, fileId: key })
       });
     } catch (e) {
       console.error('Не удалось остановить канал на сервере:', e);

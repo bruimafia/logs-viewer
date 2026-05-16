@@ -1893,6 +1893,67 @@ mark.search-match {
   margin-left: 4px;
 }
 
+/* ---------------------------------------------------------------------
+   Glob-секция в списке файлов: исходный паттерн + раскрытые файлы.
+   --------------------------------------------------------------------- */
+.glob-section {
+  margin: 4px 0;
+  border-left: 2px solid var(--border);
+  padding-left: 6px;
+}
+.glob-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 4px;
+}
+.glob-section-icon {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.glob-section-pattern {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.glob-section-base-name {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  white-space: nowrap;
+}
+.glob-section-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 2px 4px 4px;
+}
+.glob-section-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 6px 8px;
+  font-style: italic;
+}
+.glob-section-status-error {
+  color: var(--error);
+  font-style: normal;
+}
+.glob-section-status-empty {
+  color: var(--text-muted);
+}
+.glob-file-item {
+  margin-left: 4px;
+}
+
 /* =====================================================================
    Вкладка «Серверы» — карточки и формы
    ===================================================================== */

@@ -22,10 +22,134 @@ let editingFileKey = null;
 // Хранит открытые (развёрнутые) серверы в настройках. Живёт дольше рендера.
 const settingsExpandedServers = new Set();
 
+// ====================== Glob-расширение для списка файлов ======================
+//
+// Идея: glob-паттерн (например, /var/log/*/app.log) на стороне UI разворачивается
+// в список конкретных файлов через /api/expand-glob, и каждый из них отображается
+// как отдельная строка с собственным чекбоксом и автоматически сгенерированным
+// именем ("Order Service Log" из /var/log/order-service/app.log).
+//
+// globExpansionCache: "serverId::fileId" → состояние раскрытия паттерна:
+//   { status: 'loading'|'done'|'empty'|'error', files: [{path, displayName}], message? }
+const globExpansionCache = new Map();
+
+// expandedFileDetails: "serverId::fileId::idx" → детали виртуальной записи:
+//   { overridePath, displayName, baseFile, server, serverId, fileId }
+// Используется loadSelectedRemoteFiles() для построения filesToLoad.
+const expandedFileDetails = new Map();
+
+/**
+ * Является ли строка glob-паттерном (содержит подстановочные символы).
+ */
+function isGlobPath(p) {
+  return /[*?]/.test(p || '');
+}
+
+/**
+ * Извлекает basename и parent-имя из remotePath (поддерживает /-сепаратор и \-сепаратор).
+ * Возвращает { baseName, parentName }.
+ */
+function splitPath(remotePath) {
+  const parts = String(remotePath).split(/[\\/]/).filter(Boolean);
+  const baseName   = parts[parts.length - 1] || '';
+  const parentName = parts.length > 1 ? parts[parts.length - 2] : '';
+  return { baseName, parentName };
+}
+
+/**
+ * Преобразует kebab-case / snake_case / camelCase / точечную нотацию в Title Case.
+ * Примеры:
+ *   "order-service"      → "Order Service"
+ *   "payment_gateway"    → "Payment Gateway"
+ *   "user.api"           → "User Api"
+ *   "OrderService"       → "Order Service"
+ */
+function toTitleCase(s) {
+  if (!s) return '';
+  // Разбиваем по разделителям и по границе camelCase.
+  const tokens = String(s)
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[\s\-_.]+/)
+    .filter(Boolean);
+  return tokens
+    .map(t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase())
+    .join(' ');
+}
+
+/**
+ * Generic-имена файла, которые сами по себе мало что говорят пользователю —
+ * для них берём имя родительской директории, чтобы получить осмысленное название
+ * вида "Order Service" вместо "App".
+ */
+const GENERIC_BASE_NAMES = new Set([
+  'app', 'application', 'service', 'server', 'log', 'logs',
+  'main', 'output', 'stdout', 'stderr', 'error', 'errors',
+  'access', 'info', 'debug', 'trace', 'all', 'current'
+]);
+
+/**
+ * Похоже ли это имя на дату/таймштамп (имена ротированных файлов).
+ * Покрывает: 2024-01-15, 20240115, 2024_01_15, log.1, log-1 и т.п.
+ */
+function looksLikeDateOrIndex(name) {
+  if (!name) return false;
+  if (/^\d{4}[-_]?\d{2}[-_]?\d{2}/.test(name)) return true;
+  if (/^\d+$/.test(name)) return true;
+  return false;
+}
+
+/**
+ * Генерирует красивое отображаемое имя для конкретного файла на основе его пути.
+ *
+ * Стратегия:
+ *   1. Берём basename без расширения.
+ *   2. Если он generic (app, log, …) или похож на дату — пробуем имя родительской папки.
+ *   3. Переводим в Title Case и добавляем " Log".
+ *
+ * Примеры:
+ *   /var/log/order-service/app.log    → "Order Service Log"
+ *   /var/log/payments.log             → "Payments Log"
+ *   /logs/api/2024-01-15.log          → "Api Log"
+ *   C:\logs\billing\service.log       → "Billing Log"  (имя файла "service" — generic)
+ */
+function buildAutoDisplayName(remotePath) {
+  const { baseName, parentName } = splitPath(remotePath);
+  // Снимаем расширение (.log, .txt, .json — учитываем составные на всякий случай).
+  const stem = baseName.replace(/\.[^.\\/]+$/, '');
+
+  let source = stem;
+  const stemLower = stem.toLowerCase();
+  if (!stem || GENERIC_BASE_NAMES.has(stemLower) || looksLikeDateOrIndex(stem)) {
+    if (parentName) source = parentName;
+  }
+
+  const titled = toTitleCase(source) || toTitleCase(stem) || baseName || remotePath;
+  // Не добавляем " Log" дважды, если имя уже его содержит.
+  if (/\blog\b/i.test(titled)) return titled;
+  return `${titled} Log`;
+}
+
+/**
+ * Возвращает кэш-запись для glob-файла. Если её ещё нет — создаёт пустую loading-запись.
+ */
+function getGlobCacheEntry(cacheKey) {
+  let entry = globExpansionCache.get(cacheKey);
+  if (!entry) {
+    entry = { status: 'loading', files: [] };
+    globExpansionCache.set(cacheKey, entry);
+  }
+  return entry;
+}
+
 // ====================== Открытие / закрытие ======================
 
 export async function openRemoteModal() {
   state.selectedFiles.clear();
+  // Сбрасываем кэш glob-расширения: пути на серверах могли измениться
+  // (ротация, добавление новых файлов), поэтому при каждом открытии модалки
+  // перезапрашиваем актуальный список.
+  globExpansionCache.clear();
+  expandedFileDetails.clear();
   dom.loadRemoteBtn.disabled = true;
   dom.remoteModal.classList.add('active');
 
@@ -208,12 +332,15 @@ function renderFilesTab() {
   `;
 
   remoteConfig.servers.forEach(server => {
+    const hostLabel = server.type === 'local'
+      ? '📁 Локальный'
+      : `${escapeHtml(server.host || '')}:${server.port || 22}`;
     html += `
       <div class="server-section" data-server-id="${server.id}">
         <div class="server-header" onclick="toggleServerFiles('${server.id}')">
           <div class="server-info">
             <span class="server-name">${escapeHtml(server.name)}</span>
-            <span class="server-host">${escapeHtml(server.host)}:${server.port || 22}</span>
+            <span class="server-host">${hostLabel}</span>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
             <span class="server-status pending" id="status-${server.id}">Проверка...</span>
@@ -222,24 +349,7 @@ function renderFilesTab() {
           </div>
         </div>
         <div class="server-files" id="files-${server.id}">
-          ${server.files.map(file => {
-            const key = `${server.id}::${file.id}`;
-            const isLive = state.liveStreams.has(key);
-            const isGlob = /[*?]/.test(file.remotePath);
-            return `
-            <div class="file-item ${isLive ? 'live-active' : ''}" onclick="toggleFileSelection('${server.id}', '${file.id}')" id="file-${server.id}-${file.id}">
-              <input type="checkbox" class="file-checkbox" id="check-${server.id}-${file.id}" ${isLive ? 'disabled' : ''}>
-              <div style="flex:1; min-width: 0;">
-                <div class="file-name">
-                  ${escapeHtml(file.name)}
-                  ${isLive ? '<span class="file-live-badge">LIVE</span>' : ''}
-                  ${isGlob ? '<span class="glob-badge" title="Glob-паттерн: сервер раскроет шаблон в реальные файлы при загрузке">glob</span>' : ''}
-                </div>
-                <div class="file-path">${escapeHtml(file.remotePath)}</div>
-              </div>
-            </div>
-          `;
-          }).join('')}
+          ${server.files.map(file => buildFileEntryHtml(server, file)).join('')}
         </div>
       </div>
     `;
@@ -258,6 +368,204 @@ function renderFilesTab() {
   setLoadMode(state.currentLoadMode);
 
   remoteConfig.servers.forEach(server => testServerConnection(server.id));
+
+  // Запускаем асинхронное раскрытие glob-паттернов для всех файлов всех серверов.
+  // Каждый завершённый запрос локально обновит свою секцию через updateGlobSection().
+  remoteConfig.servers.forEach(server => {
+    server.files.forEach(file => {
+      if (isGlobPath(file.remotePath)) {
+        expandGlobForFile(server, file).catch(err => {
+          console.error('Ошибка раскрытия glob:', err);
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Строит HTML одной записи в списке файлов сервера.
+ *
+ * Для обычного файла — одна строка с прежним поведением.
+ * Для glob-паттерна — обёртка <div class="glob-section">…</div>:
+ *   - если кэш ещё пуст / в состоянии loading → заглушка-spinner
+ *   - если раскрыт в N файлов → N строк, каждая со своим чекбоксом
+ *   - если файлов 0 / ошибка → сообщение
+ */
+function buildFileEntryHtml(server, file) {
+  if (!isGlobPath(file.remotePath)) {
+    return buildPlainFileItemHtml(server, file);
+  }
+  const cacheKey = `${server.id}::${file.id}`;
+  const entry = globExpansionCache.get(cacheKey);
+  return `
+    <div class="glob-section" id="glob-${server.id}-${file.id}" data-glob-key="${escapeHtml(cacheKey)}">
+      ${buildGlobSectionInnerHtml(server, file, entry)}
+    </div>
+  `;
+}
+
+/**
+ * Внутреннее содержимое блока glob-секции (без обёртки) —
+ * вынесено, чтобы можно было обновлять только содержимое после раскрытия.
+ */
+function buildGlobSectionInnerHtml(server, file, entry) {
+  // Заголовок секции с исходным паттерном — показывает пользователю,
+  // откуда взялись «расширенные» строки ниже.
+  const headerHtml = `
+    <div class="glob-section-header" title="Шаблон, по которому найдены файлы">
+      <span class="glob-section-icon">⋯</span>
+      <span class="glob-section-pattern">${escapeHtml(file.remotePath)}</span>
+      <span class="glob-badge" title="Glob-паттерн раскрыт в список конкретных файлов">glob</span>
+      <span class="glob-section-base-name">${escapeHtml(file.name)}</span>
+    </div>
+  `;
+
+  if (!entry || entry.status === 'loading') {
+    return `
+      ${headerHtml}
+      <div class="glob-section-status">
+        <span class="loading-spinner" style="width:14px;height:14px;border-width:2px;"></span>
+        Раскрытие шаблона...
+      </div>
+    `;
+  }
+
+  if (entry.status === 'error') {
+    return `
+      ${headerHtml}
+      <div class="glob-section-status glob-section-status-error">
+        Ошибка раскрытия: ${escapeHtml(entry.message || 'неизвестная')}
+      </div>
+    `;
+  }
+
+  if (entry.status === 'empty' || !entry.files.length) {
+    return `
+      ${headerHtml}
+      <div class="glob-section-status glob-section-status-empty">
+        Файлов, соответствующих шаблону, не найдено.
+      </div>
+    `;
+  }
+
+  const itemsHtml = entry.files.map((f, idx) => {
+    const virtualKey = `${server.id}::${file.id}::${idx}`;
+    const isLive = state.liveStreams.has(virtualKey);
+    const isSelected = state.selectedFiles.has(virtualKey);
+    return `
+      <div class="file-item glob-file-item ${isLive ? 'live-active' : ''} ${isSelected ? 'selected' : ''}"
+           onclick="toggleExpandedFileSelection('${server.id}', '${file.id}', ${idx})"
+           id="file-${server.id}-${file.id}-${idx}">
+        <input type="checkbox" class="file-checkbox"
+               id="check-${server.id}-${file.id}-${idx}"
+               ${isLive ? 'disabled' : ''}
+               ${isSelected ? 'checked' : ''}>
+        <div style="flex:1; min-width: 0;">
+          <div class="file-name">
+            ${escapeHtml(f.displayName)}
+            ${isLive ? '<span class="file-live-badge">LIVE</span>' : ''}
+          </div>
+          <div class="file-path">${escapeHtml(f.path)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    ${headerHtml}
+    <div class="glob-section-count">Найдено файлов: ${entry.files.length}</div>
+    ${itemsHtml}
+  `;
+}
+
+/**
+ * HTML для обычного (не-glob) файла — старое поведение.
+ */
+function buildPlainFileItemHtml(server, file) {
+  const key = `${server.id}::${file.id}`;
+  const isLive = state.liveStreams.has(key);
+  const isSelected = state.selectedFiles.has(key);
+  return `
+    <div class="file-item ${isLive ? 'live-active' : ''} ${isSelected ? 'selected' : ''}"
+         onclick="toggleFileSelection('${server.id}', '${file.id}')"
+         id="file-${server.id}-${file.id}">
+      <input type="checkbox" class="file-checkbox"
+             id="check-${server.id}-${file.id}"
+             ${isLive ? 'disabled' : ''}
+             ${isSelected ? 'checked' : ''}>
+      <div style="flex:1; min-width: 0;">
+        <div class="file-name">
+          ${escapeHtml(file.name)}
+          ${isLive ? '<span class="file-live-badge">LIVE</span>' : ''}
+        </div>
+        <div class="file-path">${escapeHtml(file.remotePath)}</div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Запускает /api/expand-glob для одного файла, обновляет кэш и DOM секции.
+ * Безопасно при многократных вызовах: если кэш уже в состоянии done/error/empty,
+ * повторно запрос не делается.
+ */
+async function expandGlobForFile(server, file) {
+  const cacheKey = `${server.id}::${file.id}`;
+  const existing = globExpansionCache.get(cacheKey);
+  if (existing && existing.status !== 'loading') {
+    return existing;
+  }
+  // Помечаем как загружающийся.
+  if (!existing) globExpansionCache.set(cacheKey, { status: 'loading', files: [] });
+
+  let entry;
+  try {
+    const resp = await fetch('/api/expand-glob', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serverId: server.id, pattern: file.remotePath })
+    });
+    const result = await resp.json();
+    if (result.error) throw new Error(result.error);
+
+    const paths = Array.isArray(result.files) ? result.files : [];
+    if (paths.length === 0) {
+      entry = { status: 'empty', files: [] };
+    } else {
+      entry = {
+        status: 'done',
+        files: paths.map(p => ({ path: p, displayName: buildAutoDisplayName(p) }))
+      };
+      // Запоминаем детали виртуальных записей для последующей загрузки.
+      entry.files.forEach((f, idx) => {
+        expandedFileDetails.set(`${server.id}::${file.id}::${idx}`, {
+          overridePath: f.path,
+          displayName: `[${server.name}] ${f.displayName}`,
+          baseFile: file,
+          server,
+          serverId: server.id,
+          fileId: file.id
+        });
+      });
+    }
+  } catch (err) {
+    entry = { status: 'error', files: [], message: err.message };
+  }
+
+  globExpansionCache.set(cacheKey, entry);
+  updateGlobSectionDom(server, file, entry);
+  return entry;
+}
+
+/**
+ * Перерисовывает содержимое одной glob-секции в DOM (без полного ре-рендера вкладки).
+ * После обновления пересчитывает состояние кнопки «Выбрать все» для сервера.
+ */
+function updateGlobSectionDom(server, file, entry) {
+  const el = document.getElementById(`glob-${server.id}-${file.id}`);
+  if (!el) return;
+  el.innerHTML = buildGlobSectionInnerHtml(server, file, entry);
+  updateSelectAllBtnState(server.id);
 }
 
 function setLoadMode(mode) {
@@ -571,8 +879,12 @@ async function settingsSaveServer(sid) {
     }
   }
 
-  await saveConfigToServer({ servers }, isNew ? 'Сервер добавлен' : 'Сервер обновлён');
+  // Сбрасываем состояние редактирования ДО вызова saveConfigToServer:
+  // он вызывает loadConfig() → renderSettingsTab(), которая читает editingServerId.
+  // Если сбросить позже, форма успеет отрисоваться снова, и окно "не закроется".
   editingServerId = null;
+  editingFileKey = null;
+  await saveConfigToServer({ servers }, isNew ? 'Сервер добавлен' : 'Сервер обновлён');
 }
 
 async function settingsDeleteServer(sid) {
@@ -854,35 +1166,86 @@ function toggleFileSelection(serverId, fileId) {
   updateSelectAllBtnState(serverId);
 }
 
+/**
+ * Переключает выбор одной виртуальной (расширенной из glob) записи.
+ * Ключ строится как "serverId::fileId::idx" — он уникален для каждой записи.
+ */
+function toggleExpandedFileSelection(serverId, fileId, idx) {
+  const key     = `${serverId}::${fileId}::${idx}`;
+  const fileEl  = document.getElementById(`file-${serverId}-${fileId}-${idx}`);
+  const checkEl = document.getElementById(`check-${serverId}-${fileId}-${idx}`);
+  if (state.liveStreams.has(key)) return;
+
+  if (state.selectedFiles.has(key)) {
+    state.selectedFiles.delete(key);
+    fileEl?.classList.remove('selected');
+    if (checkEl) checkEl.checked = false;
+  } else {
+    state.selectedFiles.add(key);
+    fileEl?.classList.add('selected');
+    if (checkEl) checkEl.checked = true;
+  }
+  dom.loadRemoteBtn.disabled = state.selectedFiles.size === 0;
+  updateSelectAllBtnState(serverId);
+}
+
+/**
+ * Возвращает список «выбираемых» ключей файлов сервера с учётом glob-расширения:
+ *   - обычный файл → один ключ "sid::fid"
+ *   - glob-файл в кэше с найденными файлами → N ключей "sid::fid::idx"
+ *   - glob-файл ещё не раскрыт / пустой / ошибка → не учитываем
+ * Уже-стримящиеся (live) ключи отфильтровываются — их нельзя выбрать заново.
+ */
+function getSelectableKeysForServer(serverId) {
+  if (!state.remoteConfig) return [];
+  const server = state.remoteConfig.servers.find(s => s.id === serverId);
+  if (!server) return [];
+  const keys = [];
+  for (const file of server.files) {
+    if (isGlobPath(file.remotePath)) {
+      const entry = globExpansionCache.get(`${serverId}::${file.id}`);
+      if (!entry || entry.status !== 'done') continue;
+      for (let i = 0; i < entry.files.length; i++) {
+        keys.push(`${serverId}::${file.id}::${i}`);
+      }
+    } else {
+      keys.push(`${serverId}::${file.id}`);
+    }
+  }
+  return keys.filter(k => !state.liveStreams.has(k));
+}
+
 function updateSelectAllBtnState(serverId) {
   const btn = document.getElementById(`select-all-${serverId}`);
-  if (!btn || !state.remoteConfig) return;
-  const server = state.remoteConfig.servers.find(s => s.id === serverId);
-  if (!server) return;
-  const selectable = server.files.filter(f => !state.liveStreams.has(`${serverId}::${f.id}`));
+  if (!btn) return;
+  const selectable = getSelectableKeysForServer(serverId);
   if (selectable.length === 0) {
     btn.textContent = 'Выбрать все';
     btn.disabled = true;
     return;
   }
   btn.disabled = false;
-  const allSelected = selectable.every(f => state.selectedFiles.has(`${serverId}::${f.id}`));
+  const allSelected = selectable.every(k => state.selectedFiles.has(k));
   btn.textContent = allSelected ? 'Снять все' : 'Выбрать все';
 }
 
 function toggleSelectAllServerFiles(serverId) {
-  if (!state.remoteConfig) return;
-  const server = state.remoteConfig.servers.find(s => s.id === serverId);
-  if (!server) return;
-  const selectable = server.files.filter(f => !state.liveStreams.has(`${serverId}::${f.id}`));
+  const selectable = getSelectableKeysForServer(serverId);
   if (selectable.length === 0) return;
+  const allSelected = selectable.every(k => state.selectedFiles.has(k));
 
-  const allSelected = selectable.every(f => state.selectedFiles.has(`${serverId}::${f.id}`));
-
-  selectable.forEach(file => {
-    const key     = `${serverId}::${file.id}`;
-    const fileEl  = document.getElementById(`file-${serverId}-${file.id}`);
-    const checkEl = document.getElementById(`check-${serverId}-${file.id}`);
+  selectable.forEach(key => {
+    // Извлекаем элементы DOM для обновления визуального состояния.
+    // Ключ для glob-расширенных записей содержит idx → суффикс DOM-id отличается.
+    const parts = key.split('::');
+    let fileEl, checkEl;
+    if (parts.length === 3) {
+      fileEl  = document.getElementById(`file-${parts[0]}-${parts[1]}-${parts[2]}`);
+      checkEl = document.getElementById(`check-${parts[0]}-${parts[1]}-${parts[2]}`);
+    } else {
+      fileEl  = document.getElementById(`file-${parts[0]}-${parts[1]}`);
+      checkEl = document.getElementById(`check-${parts[0]}-${parts[1]}`);
+    }
     if (allSelected) {
       state.selectedFiles.delete(key);
       if (fileEl)  fileEl.classList.remove('selected');
@@ -926,21 +1289,45 @@ async function testServerConnection(serverId) {
   }
 }
 
-window.toggleServerFiles          = toggleServerFiles;
-window.toggleFileSelection        = toggleFileSelection;
-window.toggleSelectAllServerFiles = toggleSelectAllServerFiles;
-window.testServerConnection       = testServerConnection;
+window.toggleServerFiles            = toggleServerFiles;
+window.toggleFileSelection          = toggleFileSelection;
+window.toggleExpandedFileSelection  = toggleExpandedFileSelection;
+window.toggleSelectAllServerFiles   = toggleSelectAllServerFiles;
+window.testServerConnection         = testServerConnection;
 
 // ====================== Запуск загрузки выбранных файлов ======================
 
 export async function loadSelectedRemoteFiles() {
   if (state.selectedFiles.size === 0) return;
   const filesToLoad = Array.from(state.selectedFiles).map(key => {
-    const [serverId, fileId] = key.split('::');
+    const parts = key.split('::');
+    // Виртуальная запись (glob): ключ "sid::fid::idx" — берём детали из кэша,
+    // включая overridePath (конкретный путь файла) и сгенерированный displayName.
+    if (parts.length === 3) {
+      const details = expandedFileDetails.get(key);
+      if (!details) return null;
+      return {
+        serverId: details.serverId,
+        fileId: details.fileId,
+        server: details.server,
+        file: details.baseFile,
+        overridePath: details.overridePath,
+        displayName: details.displayName,
+        virtualKey: key
+      };
+    }
+    // Обычный файл — старое поведение.
+    const [serverId, fileId] = parts;
     const server = state.remoteConfig.servers.find(s => s.id === serverId);
     const file   = server ? server.files.find(f => f.id === fileId) : null;
-    return { serverId, fileId, server, file };
-  }).filter(f => f.server && f.file);
+    if (!server || !file) return null;
+    return {
+      serverId, fileId, server, file,
+      overridePath: null,
+      displayName: `[${server.name}] ${file.name}`,
+      virtualKey: `${serverId}::${fileId}`
+    };
+  }).filter(Boolean);
 
   dom.loadRemoteBtn.disabled = true;
   const originalText = dom.loadRemoteBtn.textContent;

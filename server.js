@@ -360,12 +360,27 @@ function getLogTimeMs(line) {
   }
 }
 
-function findServerAndFile(serverId, fileId) {
+/**
+ * Находит сервер и файл по идентификаторам.
+ *
+ * Если передан overridePath — возвращает копию файла с подменённым remotePath.
+ * Это используется для glob-расширения (пункт 7.2): запись с glob-паттерном
+ * раскрывается на стороне фронтенда в несколько виртуальных файлов, и при
+ * загрузке каждый из них приходит с конкретным путём, который и нужно
+ * подставить вместо исходного паттерна.
+ *
+ * Безопасность: overridePath применяется ТОЛЬКО если он не пустой и реально
+ * отличается от текущего пути файла; никаких изменений в конфиге не делается.
+ */
+function findServerAndFile(serverId, fileId, overridePath) {
   const config = getConfig();
   const server = config.servers.find(s => s.id === serverId);
   if (!server) return { error: 'Сервер не найден' };
   const file = server.files.find(f => f.id === fileId);
   if (!file) return { error: 'Файл не найден' };
+  if (overridePath && typeof overridePath === 'string' && overridePath.trim()) {
+    return { server, file: { ...file, remotePath: overridePath.trim() } };
+  }
   return { server, file };
 }
 
@@ -965,13 +980,14 @@ async function streamFileViaLevelFilter({ res, sendEvent, server, file, logLevel
 }
 
 app.post('/api/stream-file', async (req, res) => {
-  const { serverId, fileId, dateFrom, dateTo, logLevels } = req.body;
+  const { serverId, fileId, dateFrom, dateTo, logLevels, overridePath } = req.body;
   const fromMs = dateFrom ? new Date(dateFrom).getTime() : null;
   const toMs = dateTo ? new Date(dateTo).getTime() : null;
   const hasDateFilter = fromMs != null || toMs != null;
   const hasLevelFilter = Array.isArray(logLevels) && logLevels.length > 0;
 
-  const found = findServerAndFile(serverId, fileId);
+  // overridePath — конкретный путь, полученный после раскрытия glob-паттерна на фронте.
+  const found = findServerAndFile(serverId, fileId, overridePath);
   if (found.error) return res.status(404).json({ error: found.error });
   const { server, file } = found;
 
@@ -1091,11 +1107,12 @@ app.post('/api/stream-file', async (req, res) => {
 // offsetLines позволяет загружать "более старые" страницы (для подгрузки вверх).
 
 app.post('/api/tail-file', async (req, res) => {
-  const { serverId, fileId, lines, offsetLines } = req.body;
+  const { serverId, fileId, lines, offsetLines, overridePath } = req.body;
   const linesNum = Math.max(1, Math.min(100000, parseInt(lines) || 1000));
   const offsetNum = Math.max(0, parseInt(offsetLines) || 0);
 
-  const found = findServerAndFile(serverId, fileId);
+  // overridePath — конкретный путь, полученный после раскрытия glob-паттерна на фронте.
+  const found = findServerAndFile(serverId, fileId, overridePath);
   if (found.error) return res.status(404).json({ error: found.error });
   const { server, file } = found;
 
@@ -1212,10 +1229,11 @@ app.post('/api/tail-file', async (req, res) => {
 // ====================== API: live-стриминг (tail -F) ======================
 
 app.post('/api/tail-follow', async (req, res) => {
-  const { serverId, fileId, initialLines } = req.body;
+  const { serverId, fileId, initialLines, overridePath } = req.body;
   const initialNum = Math.max(0, Math.min(10000, parseInt(initialLines) || 100));
 
-  const found = findServerAndFile(serverId, fileId);
+  // overridePath — конкретный путь, полученный после раскрытия glob-паттерна на фронте.
+  const found = findServerAndFile(serverId, fileId, overridePath);
   if (found.error) return res.status(404).json({ error: found.error });
   const { server, file } = found;
 
@@ -1390,14 +1408,22 @@ app.post('/api/tail-follow-multi', async (req, res) => {
 
   // Стартуем все потоки параллельно. Ошибки одного файла не должны валить группу.
   for (const fileSpec of files) {
-    const file = server.files.find(f => f.id === fileSpec.fileId);
-    if (!file) {
-      sendEvent('file-error', { fileId: fileSpec.fileId, message: 'Файл не найден в конфиге' });
-      sendEvent('file-end', { fileId: fileSpec.fileId, exitCode: -1 });
+    const baseFile = server.files.find(f => f.id === fileSpec.fileId);
+    // fileKey — уникальный идентификатор потока в группе. Для glob-расширенных
+    // файлов один fileId порождает несколько потоков с разными overridePath,
+    // поэтому идентификатором служит fileKey (если не передан — берём fileId).
+    // В SSE-событиях поле называется fileId для обратной совместимости.
+    const fileId = fileSpec.fileKey || fileSpec.fileId;
+    if (!baseFile) {
+      sendEvent('file-error', { fileId, message: 'Файл не найден в конфиге' });
+      sendEvent('file-end', { fileId, exitCode: -1 });
       continue;
     }
+    // Применяем overridePath из glob-расширения (см. findServerAndFile).
+    const file = (fileSpec.overridePath && typeof fileSpec.overridePath === 'string' && fileSpec.overridePath.trim())
+      ? { ...baseFile, remotePath: fileSpec.overridePath.trim() }
+      : baseFile;
     const initialNum = Math.max(0, Math.min(10000, parseInt(fileSpec.initialLines) || 100));
-    const fileId = fileSpec.fileId;
 
     if (isLocalServer(server)) {
       // ---- Ветка локального файла (polling через fs) ----
