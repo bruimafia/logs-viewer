@@ -71,12 +71,18 @@ function maybeRebuildChips() {
 // ====================== Сводные индикаторы ======================
 
 export function updateOpenFilesLabel() {
-  if (state.openedFiles.length === 0) {
-    dom.openFilesLabel.textContent = 'Файлы не выбраны';
-    dom.openFilesLabel.title = '';
+  const countEl = dom.openFilesLabel.querySelector('.open-files-count');
+  const n = state.openedFiles.length;
+  if (n === 0) {
+    if (countEl) countEl.textContent = '';
+    dom.openFilesLabel.title = 'Файлы не выбраны';
+    dom.openFilesLabel.setAttribute('aria-label', 'Файлы не выбраны');
+    dom.openFilesLabel.classList.remove('has-files');
   } else {
-    dom.openFilesLabel.textContent = state.openedFiles.join(', ');
+    if (countEl) countEl.textContent = n;
     dom.openFilesLabel.title = state.openedFiles.join('\n');
+    dom.openFilesLabel.setAttribute('aria-label', `Открыто файлов: ${n}`);
+    dom.openFilesLabel.classList.add('has-files');
   }
 }
 
@@ -165,12 +171,14 @@ export function updateLiveIndicator() {
 // ====================== Баннер активной trace-трассы ======================
 
 /**
- * Устанавливает активный фильтр по traceId. Передача '' / null снимает фильтр.
+ * Устанавливает активный фильтр по traceId. Передача '' / null / undefined снимает фильтр.
  * Вызывается изнутри (клик по бейджу) и из app.js (Clear-кнопка, очистка
  * при загрузке новых файлов).
  */
 export function setTraceFilter(traceId) {
-  state.currentTraceFilter = traceId || null;
+  // Устанавливаем фильтр только если traceId это непустая строка
+  // Пустая строка, null или undefined означают "без фильтра"
+  state.currentTraceFilter = (traceId && String(traceId).trim()) || null;
   render();
 }
 
@@ -248,7 +256,8 @@ function filterLogs() {
     fromMs: dom.timeFrom.value ? new Date(dom.timeFrom.value).getTime() : null,
     toMs: dom.timeTo.value ? new Date(dom.timeTo.value).getTime() : null,
     serviceVisibility: state.serviceVisibility,
-    traceFilter: state.currentTraceFilter || null
+    // Передаем traceFilter как есть, без преобразования пустой строки в null
+    traceFilter: state.currentTraceFilter
   };
   return sortLogs(applyFilters(state.allLogs, filters), dom.sortBy.value);
 }

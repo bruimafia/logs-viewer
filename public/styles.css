@@ -133,14 +133,43 @@ header {
 .btn-danger:hover { background: var(--btn-danger-hover); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.open-files {
-  font-size: 12px;
+/* Компактная кнопка «открытые файлы» в шапке.
+   Иконка + счётчик; полный список имён — в нативном title-tooltip. */
+.open-files-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  background: var(--border);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   color: var(--text-muted);
-  flex: 1 1 0;
-  min-width: 0;
-  white-space: normal;
-  word-break: break-word;
-  line-height: 1.4;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: default;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+/* При наличии файлов слегка подсвечиваем кнопку */
+.open-files-btn.has-files {
+  color: var(--text);
+  border-color: var(--border);
+  cursor: help;
+}
+.open-files-btn.has-files:hover {
+  background: var(--btn-hover);
+  border-color: var(--text-muted);
+}
+.open-files-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.open-files-count {
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 1ch;
+  line-height: 1;
 }
 
 /* Live-индикатор в шапке */

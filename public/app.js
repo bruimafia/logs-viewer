@@ -176,8 +176,6 @@ document.addEventListener('click', (e) => {
 attachScrollHandler();
 // Делегирование клика по бейджам traceId + клик по «✕» в баннере фильтра.
 attachTraceBadgeHandler();
-attachScrollHandler();
-attachTraceBadgeHandler();
 attachErrorAlertHandlers();  // <-- добавили: пункты 3.2 и 3.3
 attachSparklineHandlers();  // <-- пункт 3.4: мини-спарклайн со статистикой
 attachTzSelectorHandlers();  // пункт 6.4: селектор часового пояса
