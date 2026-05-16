@@ -344,8 +344,11 @@ function buildServerCardHtml(server) {
       <div class="settings-server-row">
         <div class="settings-server-meta">
           <span class="settings-server-name">${escapeHtml(server.name)}</span>
-          <span class="settings-server-addr">${escapeHtml(server.host)}:${server.port || 22}</span>
-          <span class="settings-server-user">👤 ${escapeHtml(server.username || '')}</span>
+          ${server.type === 'local'
+            ? `<span class="local-server-badge" title="Файлы читаются Node.js напрямую, без SSH">📁 Локальный</span>`
+            : `<span class="settings-server-addr">${escapeHtml(server.host || '')}:${server.port || 22}</span>
+               <span class="settings-server-user">👤 ${escapeHtml(server.username || '')}</span>`
+          }
         </div>
         <div class="settings-server-actions">
           <button class="btn" onclick="window.__rmEditServer('${server.id}')" title="Редактировать параметры сервера">✎ Редактировать</button>
@@ -364,12 +367,13 @@ function buildServerCardHtml(server) {
 }
 
 function buildServerFormHtml(server) {
-  const isNew = !server;
-  const sid = isNew ? '__new__' : server.id;
+  const isNew    = !server;
+  const sid      = isNew ? '__new__' : server.id;
+  const isLocal  = !isNew && server.type === 'local';
   const vals = {
-    name: isNew ? '' : escapeHtml(server.name),
-    host: isNew ? '' : escapeHtml(server.host),
-    port: isNew ? '22' : (server.port || 22),
+    name:     isNew ? '' : escapeHtml(server.name),
+    host:     isNew ? '' : escapeHtml(server.host     || ''),
+    port:     isNew ? '22' : (server.port || 22),
     username: isNew ? '' : escapeHtml(server.username || ''),
     password: isNew ? '' : '••••••••'
   };
@@ -377,41 +381,75 @@ function buildServerFormHtml(server) {
   return `
     <div class="settings-server-form" data-server-id="${sid}">
       <div class="settings-form-title">${isNew ? 'Добавить сервер' : 'Редактировать сервер'}</div>
-      <div class="settings-form-grid">
-        <div class="settings-form-group">
+
+      <!-- Тип сервера -->
+      <div class="settings-form-group settings-form-group-full" style="margin-bottom:4px;">
+        <label class="settings-form-label">Тип сервера</label>
+        <div class="settings-type-selector">
+          <label class="settings-type-option">
+            <input type="radio" name="sform-type-${sid}" id="sform-type-ssh-${sid}" value="ssh"
+                   ${!isLocal ? 'checked' : ''}
+                   onchange="window.__rmToggleServerType('${sid}')">
+            <span>🌐 SSH (удалённый)</span>
+          </label>
+          <label class="settings-type-option">
+            <input type="radio" name="sform-type-${sid}" id="sform-type-local-${sid}" value="local"
+                   ${isLocal ? 'checked' : ''}
+                   onchange="window.__rmToggleServerType('${sid}')">
+            <span>📁 Локальный</span>
+          </label>
+        </div>
+        <div class="settings-form-hint" id="sform-local-hint-${sid}" ${!isLocal ? 'style="display:none"' : ''}>
+          Файлы читаются напрямую Node.js-сервером (127.0.0.1). SSH не используется.
+          Пути — в формате ОС сервера: <code>C:\logs\*.log</code> или <code>/var/log/*.log</code>
+        </div>
+      </div>
+
+      <!-- SSH-поля — скрываются для локального типа -->
+      <div id="sform-ssh-wrap-${sid}" ${isLocal ? 'style="display:none"' : ''}>
+        <div class="settings-form-grid">
+          <div class="settings-form-group">
+            <label class="settings-form-label" for="sform-host-${sid}">Хост *</label>
+            <input class="settings-form-input" type="text" id="sform-host-${sid}"
+                   value="${vals.host}" placeholder="192.168.1.1" autocomplete="off">
+          </div>
+          <div class="settings-form-group settings-form-group-small">
+            <label class="settings-form-label" for="sform-port-${sid}">Порт</label>
+            <input class="settings-form-input" type="number" id="sform-port-${sid}"
+                   value="${vals.port}" min="1" max="65535">
+          </div>
+          <div class="settings-form-group">
+            <label class="settings-form-label" for="sform-user-${sid}">Пользователь *</label>
+            <input class="settings-form-input" type="text" id="sform-user-${sid}"
+                   value="${vals.username}" placeholder="ubuntu" autocomplete="off">
+          </div>
+          <div class="settings-form-group settings-form-group-full">
+            <label class="settings-form-label" for="sform-pass-${sid}">Пароль${isNew ? ' *' : ''}</label>
+            <div class="settings-password-wrap">
+              <input class="settings-form-input" type="password" id="sform-pass-${sid}"
+                     value="${vals.password}"
+                     placeholder="${isNew ? 'Введите пароль' : 'Оставьте без изменений'}">
+              <button class="settings-password-toggle" type="button"
+                      onclick="window.__rmTogglePass('sform-pass-${sid}')"
+                      title="Показать / скрыть пароль" aria-label="Показать пароль">👁</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Общие поля -->
+      <div class="settings-form-grid" style="margin-top:10px;">
+        <div class="settings-form-group settings-form-group-full">
           <label class="settings-form-label" for="sform-name-${sid}">Название *</label>
           <input class="settings-form-input" type="text" id="sform-name-${sid}"
                  value="${vals.name}" placeholder="Production" autocomplete="off">
         </div>
-        <div class="settings-form-group">
-          <label class="settings-form-label" for="sform-host-${sid}">Хост *</label>
-          <input class="settings-form-input" type="text" id="sform-host-${sid}"
-                 value="${vals.host}" placeholder="192.168.1.1" autocomplete="off">
-        </div>
-        <div class="settings-form-group settings-form-group-small">
-          <label class="settings-form-label" for="sform-port-${sid}">Порт</label>
-          <input class="settings-form-input" type="number" id="sform-port-${sid}"
-                 value="${vals.port}" min="1" max="65535">
-        </div>
-        <div class="settings-form-group">
-          <label class="settings-form-label" for="sform-user-${sid}">Пользователь *</label>
-          <input class="settings-form-input" type="text" id="sform-user-${sid}"
-                 value="${vals.username}" placeholder="ubuntu" autocomplete="off">
-        </div>
-        <div class="settings-form-group settings-form-group-full">
-          <label class="settings-form-label" for="sform-pass-${sid}">Пароль${isNew ? ' *' : ''}</label>
-          <div class="settings-password-wrap">
-            <input class="settings-form-input" type="password" id="sform-pass-${sid}"
-                   value="${vals.password}"
-                   placeholder="${isNew ? 'Введите пароль' : 'Оставьте без изменений'}">
-            <button class="settings-password-toggle" type="button"
-                    onclick="window.__rmTogglePass('sform-pass-${sid}')"
-                    title="Показать / скрыть пароль" aria-label="Показать пароль">👁</button>
-          </div>
-        </div>
       </div>
+
       <div class="settings-form-actions">
-        <button class="btn" type="button" onclick="window.__rmTestConnForm('${sid}')">Проверить соединение</button>
+        <button class="btn" type="button" id="sform-test-btn-${sid}"
+                onclick="window.__rmTestConnForm('${sid}')"
+                ${isLocal ? 'style="display:none"' : ''}>Проверить соединение</button>
         <span class="settings-conn-status" id="sform-conn-${sid}"></span>
         <div style="flex:1;"></div>
         <button class="btn" type="button" onclick="window.__rmCancelServer()">Отмена</button>
@@ -479,7 +517,8 @@ function buildFileFormHtml(serverId, file) {
 // ====================== Обработчики настроек серверов ======================
 
 async function settingsSaveServer(sid) {
-  const isNew = sid === '__new__';
+  const isNew     = sid === '__new__';
+  const isLocal   = document.getElementById(`sform-type-local-${sid}`)?.checked ?? false;
 
   const nameEl  = document.getElementById(`sform-name-${sid}`);
   const hostEl  = document.getElementById(`sform-host-${sid}`);
@@ -496,11 +535,13 @@ async function settingsSaveServer(sid) {
   const password = passEl?.value || '';
 
   let hasError = false;
-  if (!name)     { nameEl?.classList.add('input-error'); hasError = true; }
-  if (!host)     { hostEl?.classList.add('input-error'); hasError = true; }
-  if (!username) { userEl?.classList.add('input-error'); hasError = true; }
-  if (isNew && !password) { passEl?.classList.add('input-error'); hasError = true; }
-  if (port < 1 || port > 65535) { portEl?.classList.add('input-error'); hasError = true; }
+  if (!name) { nameEl?.classList.add('input-error'); hasError = true; }
+  if (!isLocal) {
+    if (!host)     { hostEl?.classList.add('input-error'); hasError = true; }
+    if (!username) { userEl?.classList.add('input-error'); hasError = true; }
+    if (isNew && !password) { passEl?.classList.add('input-error'); hasError = true; }
+    if (port < 1 || port > 65535) { portEl?.classList.add('input-error'); hasError = true; }
+  }
   if (hasError) {
     toast.error('Заполните обязательные поля', { title: 'Ошибка валидации' });
     return;
@@ -509,15 +550,25 @@ async function settingsSaveServer(sid) {
   const servers = [...(state.remoteConfig?.servers || [])];
 
   if (isNew) {
-    servers.push({
-      id: 'server-' + Date.now(),
-      name, host, port, username, password,
-      files: []
-    });
+    const newServer = { id: 'server-' + Date.now(), name, files: [] };
+    if (isLocal) {
+      newServer.type = 'local';
+    } else {
+      newServer.host = host; newServer.port = port;
+      newServer.username = username; newServer.password = password;
+    }
+    servers.push(newServer);
   } else {
     const idx = servers.findIndex(s => s.id === sid);
     if (idx === -1) { toast.error('Сервер не найден'); return; }
-    servers[idx] = { ...servers[idx], name, host, port, username, password };
+    if (isLocal) {
+      // При смене типа на локальный убираем SSH-поля
+      const { host: _h, port: _p, username: _u, password: _pw, type: _t, ...rest } = servers[idx];
+      servers[idx] = { ...rest, name, type: 'local' };
+    } else {
+      servers[idx] = { ...servers[idx], name, host, port, username, password, type: undefined };
+      delete servers[idx].type;
+    }
   }
 
   await saveConfigToServer({ servers }, isNew ? 'Сервер добавлен' : 'Сервер обновлён');
@@ -760,6 +811,16 @@ window.__rmDeleteFile = (serverId, fileId) => settingsDeleteFile(serverId, fileI
 window.__rmTogglePass = (inputId) => {
   const el = document.getElementById(inputId);
   if (el) el.type = el.type === 'password' ? 'text' : 'password';
+};
+
+window.__rmToggleServerType = (sid) => {
+  const isLocal  = document.getElementById(`sform-type-local-${sid}`)?.checked;
+  const sshWrap  = document.getElementById(`sform-ssh-wrap-${sid}`);
+  const hint     = document.getElementById(`sform-local-hint-${sid}`);
+  const testBtn  = document.getElementById(`sform-test-btn-${sid}`);
+  if (sshWrap) sshWrap.style.display  = isLocal ? 'none' : '';
+  if (hint)    hint.style.display     = isLocal ? ''     : 'none';
+  if (testBtn) testBtn.style.display  = isLocal ? 'none' : '';
 };
 window.__rmTestConnForm = (sid) => settingsTestConnForm(sid);
 window.__rmGlobPreview  = (serverId, escapedKey) => settingsGlobPreview(serverId, escapedKey);
