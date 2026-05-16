@@ -360,12 +360,27 @@ function getLogTimeMs(line) {
   }
 }
 
-function findServerAndFile(serverId, fileId) {
+/**
+ * Находит сервер и файл по идентификаторам.
+ *
+ * Если передан overridePath — возвращает копию файла с подменённым remotePath.
+ * Это используется для glob-расширения (пункт 7.2): запись с glob-паттерном
+ * раскрывается на стороне фронтенда в несколько виртуальных файлов, и при
+ * загрузке каждый из них приходит с конкретным путём, который и нужно
+ * подставить вместо исходного паттерна.
+ *
+ * Безопасность: overridePath применяется ТОЛЬКО если он не пустой и реально
+ * отличается от текущего пути файла; никаких изменений в конфиге не делается.
+ */
+function findServerAndFile(serverId, fileId, overridePath) {
   const config = getConfig();
   const server = config.servers.find(s => s.id === serverId);
   if (!server) return { error: 'Сервер не найден' };
   const file = server.files.find(f => f.id === fileId);
   if (!file) return { error: 'Файл не найден' };
+  if (overridePath && typeof overridePath === 'string' && overridePath.trim()) {
+    return { server, file: { ...file, remotePath: overridePath.trim() } };
+  }
   return { server, file };
 }
 
@@ -385,9 +400,12 @@ app.get('/api/config', (req, res) => {
 app.post('/api/config', (req, res) => {
   const newConfig = req.body;
   const currentConfig = getConfig();
-  newConfig.servers.forEach((server, index) => {
-    if (server.password === '••••••••' && currentConfig.servers[index]) {
-      server.password = currentConfig.servers[index].password;
+  // Сопоставляем по serverId, а не по индексу — это безопасно при добавлении/удалении серверов.
+  const currentServerMap = new Map(currentConfig.servers.map(s => [s.id, s]));
+  newConfig.servers.forEach(server => {
+    if (server.password === '••••••••') {
+      const currentServer = currentServerMap.get(server.id);
+      if (currentServer) server.password = currentServer.password;
     }
   });
   if (saveConfig(newConfig)) res.json({ success: true });
@@ -408,6 +426,9 @@ app.post('/api/test-connection-by-id', async (req, res) => {
   const server = config.servers.find(s => s.id === serverId);
   if (!server) return res.json({ success: false, message: 'Сервер не найден' });
 
+  // Для локального сервера SSH не нужен — просто сообщаем об успехе.
+  if (isLocalServer(server)) return res.json({ success: true, message: 'Локальный сервер' });
+
   const sftp = new SftpClient();
   try {
     await sftp.connect({
@@ -424,6 +445,288 @@ app.post('/api/test-connection-by-id', async (req, res) => {
     res.json({ success: false, message: err.message });
   }
 });
+
+// ====================== API: раскрытие glob-паттернов (пункт 7.2) ======================
+
+/**
+ * Раскрывает glob-паттерн в список реальных файлов через SSH exec.
+ * Использует bash для надёжного раскрытия wildcards: * ? [].
+ * Возвращает пустой массив при ошибке или если файлов не найдено.
+ */
+async function expandGlobPattern(server, pattern) {
+  const pool = getSshPool(server);
+  // ls -1d выводит каждый файл на отдельной строке; 2>/dev/null подавляет ошибку «не найдено».
+  const cmd = `bash -c 'ls -1d ${shellEscape(pattern)} 2>/dev/null | sort'`;
+  return new Promise((resolve) => {
+    pool.exec(cmd).then(stream => {
+      let output = '';
+      stream.on('data', chunk => { output += chunk.toString('utf-8'); });
+      stream.stderr?.on('data', () => {});
+      stream.on('close', () => {
+        const files = output.split('\n').map(f => f.trim()).filter(f => f.length > 0);
+        resolve(files);
+      });
+      stream.on('error', () => resolve([]));
+    }).catch(() => resolve([]));
+  });
+}
+
+app.post('/api/expand-glob', async (req, res) => {
+  const { serverId, pattern } = req.body;
+  if (!pattern) return res.json({ files: [], isGlob: false });
+
+  const hasWildcard = /[*?]/.test(pattern);
+  if (!hasWildcard) return res.json({ files: [pattern], isGlob: false });
+
+  const config = getConfig();
+  const server = config.servers.find(s => s.id === serverId);
+  if (!server) return res.status(400).json({ error: 'Сервер не найден' });
+
+  // Локальный сервер: раскрываем паттерн через Node.js fs без SSH.
+  if (isLocalServer(server)) {
+    const files = expandGlobLocal(pattern);
+    return res.json({ files, isGlob: true, pattern });
+  }
+
+  try {
+    const files = await expandGlobPattern(server, pattern);
+    res.json({ files, isGlob: true, pattern });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====================== Локальные файлы (без SSH) ======================
+
+/** true, если сервер обращается к файлам на той же машине, где запущен Node. */
+function isLocalServer(server) {
+  return server.type === 'local';
+}
+
+/**
+ * Раскрывает glob-паттерн для локальных файлов без внешних зависимостей.
+ * Поддерживает * (любые символы кроме разделителя) и ? (один символ).
+ * Нечувствительность к регистру включается на Windows автоматически.
+ */
+function patternSegmentToRegex(seg) {
+  const esc = seg.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const src = '^' + esc.replace(/\*/g, '[^\\\\/]*').replace(/\?/g, '[^\\\\/]') + '$';
+  return new RegExp(src, process.platform === 'win32' ? 'i' : '');
+}
+
+function matchGlobSegmentsLocal(base, segments) {
+  if (segments.length === 0) {
+    try { return fs.statSync(base).isFile() ? [base] : []; } catch { return []; }
+  }
+  const [current, ...rest] = segments;
+  const isLast = rest.length === 0;
+  const regex = patternSegmentToRegex(current);
+  let entries;
+  try { entries = fs.readdirSync(base, { withFileTypes: true }); } catch { return []; }
+  const results = [];
+  for (const entry of entries) {
+    if (!regex.test(entry.name)) continue;
+    const full = path.join(base, entry.name);
+    if (isLast) { if (entry.isFile()) results.push(full); }
+    else        { if (entry.isDirectory()) results.push(...matchGlobSegmentsLocal(full, rest)); }
+  }
+  return results;
+}
+
+function expandGlobLocal(pattern) {
+  const normed = path.normalize(pattern);
+  const segs   = normed.split(path.sep);
+  let fixedSegs = [], globSegs = [], inGlob = false;
+  for (const seg of segs) {
+    if (!inGlob && !seg.includes('*') && !seg.includes('?')) fixedSegs.push(seg);
+    else { inGlob = true; globSegs.push(seg); }
+  }
+  if (globSegs.length === 0) {
+    try { return fs.statSync(normed).isFile() ? [normed] : []; } catch { return []; }
+  }
+  const base = fixedSegs.join(path.sep) || path.sep;
+  return matchGlobSegmentsLocal(base, globSegs).sort();
+}
+
+/**
+ * Строит фильтр строк по grepPattern/grepRegex/grepCaseInsensitive для локальных файлов.
+ * Возвращает null, если паттерн не задан.
+ */
+function makeLocalLineFilter(body) {
+  const pattern = typeof body?.grepPattern === 'string' ? body.grepPattern.trim() : '';
+  if (!pattern) return null;
+  if (body.grepRegex) {
+    try {
+      const re = new RegExp(pattern, body.grepCaseInsensitive ? 'i' : '');
+      return line => re.test(line);
+    } catch { return null; }
+  }
+  const search = body.grepCaseInsensitive ? pattern.toLowerCase() : pattern;
+  return line => (body.grepCaseInsensitive ? line.toLowerCase() : line).includes(search);
+}
+
+/**
+ * Читает последние n строк файла через Node.js ReadStream.
+ * Применяет необязательный фильтр к каждой строке.
+ */
+function readLastNLinesLocal(filePath, n, filter = null) {
+  return new Promise((resolve) => {
+    const lines = [];
+    let buf = '';
+    const stream = fs.createReadStream(filePath, { highWaterMark: 65536 });
+    stream.on('data', chunk => {
+      buf += chunk.toString('utf-8');
+      const parts = buf.split('\n');
+      buf = parts.pop();
+      for (const line of parts) { if (!filter || filter(line)) lines.push(line); }
+    });
+    stream.on('end',   () => { if (buf && (!filter || filter(buf))) lines.push(buf); resolve(lines.slice(-n)); });
+    stream.on('error', () => resolve([]));
+  });
+}
+
+// ====================== Локальный stream-file ======================
+
+async function streamFileLocal({ res, sendEvent, server, file, body, fromMs, toMs }) {
+  const filePath = file.remotePath;
+  const hasDateFilter = fromMs != null || toMs != null;
+  const lineFilter   = makeLocalLineFilter(body);
+  const levelFilter  = Array.isArray(body?.logLevels) && body.logLevels.length > 0
+    ? body.logLevels.map(l => l.toUpperCase()) : null;
+
+  let totalBytes = 0;
+  try { totalBytes = fs.statSync(filePath).size; }
+  catch (err) { sendEvent('error', { message: `Файл не найден: ${err.message}` }); return res.end(); }
+
+  sendEvent('start', {
+    fileName: path.basename(filePath), filePath,
+    serverName: server.name, totalBytes, local: true
+  });
+
+  const shouldKeep = (line) => {
+    if (!line.trim()) return false;
+    if (lineFilter && !lineFilter(line)) return false;
+    if (levelFilter) {
+      try { const lv = JSON.parse(line)?.level; if (lv && !levelFilter.includes(lv.toUpperCase())) return false; }
+      catch {}
+    }
+    if (hasDateFilter) {
+      const t = getLogTimeMs(line);
+      if (fromMs != null && t < fromMs) return false;
+      if (toMs != null && t > toMs)    return false;
+    }
+    return true;
+  };
+
+  let processedBytes = 0;
+  let buf = '';
+  const readStream = fs.createReadStream(filePath, { highWaterMark: 65536 });
+
+  readStream.on('data', chunk => {
+    processedBytes += chunk.length;
+    buf += chunk.toString('utf-8');
+    const parts = buf.split('\n');
+    buf = parts.pop();
+    sendEvent('progress', {
+      bytesLoaded: processedBytes, totalBytes,
+      percent: totalBytes > 0 ? Math.round((processedBytes / totalBytes) * 100) : 0
+    });
+    if (parts.length > 0) {
+      const toSend = parts.filter(shouldKeep);
+      if (toSend.length > 0) sendEvent('lines', { lines: toSend });
+    }
+  });
+  readStream.on('end', () => {
+    if (buf.trim() && shouldKeep(buf)) sendEvent('lines', { lines: [buf] });
+    sendEvent('complete', { bytesLoaded: processedBytes, totalBytes });
+    res.end();
+  });
+  readStream.on('error', err => { sendEvent('error', { message: err.message }); res.end(); });
+  res.on('close', () => { try { readStream.destroy(); } catch {} });
+}
+
+// ====================== Локальный tail-file ======================
+
+async function tailFileLocal({ res, sendEvent, server, file, linesNum, offsetNum, body }) {
+  const filePath   = file.remotePath;
+  const lineFilter = makeLocalLineFilter(body);
+
+  sendEvent('start', {
+    fileName: path.basename(filePath), filePath,
+    serverName: server.name, lines: linesNum, offsetLines: offsetNum,
+    mode: 'tail', local: true
+  });
+  try {
+    const total     = linesNum + offsetNum;
+    // readLastNLinesLocal возвращает строки от старых к новым.
+    // slice(0, linesNum) = «старшая» половина окна — аналог tail -n total | head -n linesNum.
+    const allLines  = await readLastNLinesLocal(filePath, total, lineFilter);
+    const pageLines = allLines.slice(0, linesNum);
+    if (pageLines.length > 0) sendEvent('lines', { lines: pageLines });
+    sendEvent('complete', { totalLines: pageLines.length, exitCode: 0 });
+  } catch (err) {
+    sendEvent('error', { message: err.message });
+  }
+  res.end();
+}
+
+// ====================== Локальный tail-follow (live polling) ======================
+
+async function tailFollowLocalSse({ res, sendEvent, file, server, initialNum, keepAlive }) {
+  const filePath = file.remotePath;
+  let stopped = false;
+  let intervalId = null;
+
+  const cleanup = () => {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(keepAlive);
+    if (intervalId) clearInterval(intervalId);
+    try { res.end(); } catch {}
+  };
+  res.on('close', cleanup);
+
+  sendEvent('start', {
+    fileName: path.basename(filePath), filePath,
+    serverName: server.name, mode: 'live', initialLines: initialNum, local: true
+  });
+
+  try {
+    const initLines = await readLastNLinesLocal(filePath, initialNum);
+    if (!stopped && initLines.length > 0) sendEvent('lines', { lines: initLines });
+  } catch (err) {
+    sendEvent('error', { message: err.message });
+    return cleanup();
+  }
+
+  let currentSize = 0;
+  try { currentSize = fs.statSync(filePath).size; }
+  catch (err) { sendEvent('error', { message: err.message }); return cleanup(); }
+
+  let trailingBuf = '';
+  intervalId = setInterval(() => {
+    if (stopped) return;
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.size > currentSize) {
+        const newBytes = stat.size - currentSize;
+        const chunk = Buffer.alloc(newBytes);
+        const fd = fs.openSync(filePath, 'r');
+        fs.readSync(fd, chunk, 0, newBytes, currentSize);
+        fs.closeSync(fd);
+        currentSize = stat.size;
+        trailingBuf += chunk.toString('utf-8');
+        const parts = trailingBuf.split('\n');
+        trailingBuf = parts.pop();
+        if (parts.length > 0 && !stopped) sendEvent('lines', { lines: parts });
+      } else if (stat.size < currentSize) {
+        currentSize = stat.size;
+        trailingBuf = '';
+        sendEvent('info', { message: 'Файл ротирован' });
+      }
+    } catch { /* временная ошибка — повторим в следующем цикле */ }
+  }, 250);
+}
 
 app.post('/api/test-connection', async (req, res) => {
   const { host, port, username, password } = req.body;
@@ -677,13 +980,14 @@ async function streamFileViaLevelFilter({ res, sendEvent, server, file, logLevel
 }
 
 app.post('/api/stream-file', async (req, res) => {
-  const { serverId, fileId, dateFrom, dateTo, logLevels } = req.body;
+  const { serverId, fileId, dateFrom, dateTo, logLevels, overridePath } = req.body;
   const fromMs = dateFrom ? new Date(dateFrom).getTime() : null;
   const toMs = dateTo ? new Date(dateTo).getTime() : null;
   const hasDateFilter = fromMs != null || toMs != null;
   const hasLevelFilter = Array.isArray(logLevels) && logLevels.length > 0;
 
-  const found = findServerAndFile(serverId, fileId);
+  // overridePath — конкретный путь, полученный после раскрытия glob-паттерна на фронте.
+  const found = findServerAndFile(serverId, fileId, overridePath);
   if (found.error) return res.status(404).json({ error: found.error });
   const { server, file } = found;
 
@@ -695,6 +999,11 @@ app.post('/api/stream-file', async (req, res) => {
 
   setSseHeaders(res);
   const sendEvent = makeSseSender(res);
+
+  // Локальный сервер: все варианты фильтрации реализованы в Node.js, без SSH/SFTP.
+  if (isLocalServer(server)) {
+    return streamFileLocal({ res, sendEvent, server, file, body: req.body, fromMs, toMs });
+  }
 
   if (hasGrep) {
     return streamFileViaGrep({ res, sendEvent, server, file, grepPrefix, fromMs, toMs });
@@ -798,11 +1107,12 @@ app.post('/api/stream-file', async (req, res) => {
 // offsetLines позволяет загружать "более старые" страницы (для подгрузки вверх).
 
 app.post('/api/tail-file', async (req, res) => {
-  const { serverId, fileId, lines, offsetLines } = req.body;
+  const { serverId, fileId, lines, offsetLines, overridePath } = req.body;
   const linesNum = Math.max(1, Math.min(100000, parseInt(lines) || 1000));
   const offsetNum = Math.max(0, parseInt(offsetLines) || 0);
 
-  const found = findServerAndFile(serverId, fileId);
+  // overridePath — конкретный путь, полученный после раскрытия glob-паттерна на фронте.
+  const found = findServerAndFile(serverId, fileId, overridePath);
   if (found.error) return res.status(404).json({ error: found.error });
   const { server, file } = found;
 
@@ -811,6 +1121,11 @@ app.post('/api/tail-file', async (req, res) => {
 
   setSseHeaders(res);
   const sendEvent = makeSseSender(res);
+
+  // Локальный сервер: читаем через Node.js без SSH.
+  if (isLocalServer(server)) {
+    return tailFileLocal({ res, sendEvent, server, file, linesNum, offsetNum, body: req.body });
+  }
 
   let stream;
   let cleaned = false;
@@ -914,10 +1229,11 @@ app.post('/api/tail-file', async (req, res) => {
 // ====================== API: live-стриминг (tail -F) ======================
 
 app.post('/api/tail-follow', async (req, res) => {
-  const { serverId, fileId, initialLines } = req.body;
+  const { serverId, fileId, initialLines, overridePath } = req.body;
   const initialNum = Math.max(0, Math.min(10000, parseInt(initialLines) || 100));
 
-  const found = findServerAndFile(serverId, fileId);
+  // overridePath — конкретный путь, полученный после раскрытия glob-паттерна на фронте.
+  const found = findServerAndFile(serverId, fileId, overridePath);
   if (found.error) return res.status(404).json({ error: found.error });
   const { server, file } = found;
 
@@ -932,6 +1248,11 @@ app.post('/api/tail-follow', async (req, res) => {
     if (res.writableEnded || res.destroyed) return;
     try { res.write(': keepalive\n\n'); } catch (e) {}
   }, 25000);
+
+  // Локальный сервер: polling через fs вместо SSH tail -F.
+  if (isLocalServer(server)) {
+    return tailFollowLocalSse({ res, sendEvent, file, server, initialNum, keepAlive });
+  }
 
   // SSH-клиент общий через пул, поэтому закрываем только канал —
   // отправляем remote-процессу tail сигнал TERM и закрываем канал.
@@ -1045,7 +1366,9 @@ app.post('/api/tail-follow-multi', async (req, res) => {
   const sendEvent = makeSseSender(res);
 
   const groupId = newGroupId();
-  const group = { streams: new Map(), sendEvent, serverId };
+  // closers: Map<fileId, () => void> — унифицированный способ остановить один поток
+  // (SSH-stream.signal('TERM') или clearInterval для локального polling).
+  const group = { closers: new Map(), sendEvent, serverId };
   liveGroups.set(groupId, group);
 
   // Пинг каждые 25с для поддержания соединения через прокси.
@@ -1059,23 +1382,19 @@ app.post('/api/tail-follow-multi', async (req, res) => {
     if (closed) return;
     closed = true;
     clearInterval(keepAlive);
-    for (const stream of group.streams.values()) {
-      try { stream.signal('TERM'); } catch (e) {}
-      try { stream.close(); } catch (e) {}
-    }
-    group.streams.clear();
+    for (const closer of group.closers.values()) { try { closer(); } catch {} }
+    group.closers.clear();
     liveGroups.delete(groupId);
     try { res.end(); } catch (e) {}
   };
 
-  // Закрытие отдельного канала по fileId. Если был последний — закрываем всё.
+  // Закрытие отдельного потока по fileId. Если был последний — закрываем всё.
   const closeFile = (fileId) => {
-    const stream = group.streams.get(fileId);
-    if (!stream) return false;
-    group.streams.delete(fileId);
-    try { stream.signal('TERM'); } catch (e) {}
-    try { stream.close(); } catch (e) {}
-    if (group.streams.size === 0) {
+    const closer = group.closers.get(fileId);
+    if (!closer) return false;
+    group.closers.delete(fileId);
+    try { closer(); } catch {}
+    if (group.closers.size === 0) {
       sendEvent('group-end', {});
       closeAll();
     }
@@ -1085,22 +1404,92 @@ app.post('/api/tail-follow-multi', async (req, res) => {
 
   sendEvent('start', { groupId });
 
-  const pool = getSshPool(server);
+  const pool = isLocalServer(server) ? null : getSshPool(server);
 
-  // Стартуем все потоки. exec через пул синхронно резервирует слот,
-  // поэтому 10 параллельных запусков НЕ откроют 10 SSH-соединений.
-  // Каждый файл независимо рапортует о готовности через file-start.
+  // Стартуем все потоки параллельно. Ошибки одного файла не должны валить группу.
   for (const fileSpec of files) {
-    const file = server.files.find(f => f.id === fileSpec.fileId);
-    if (!file) {
-      sendEvent('file-error', { fileId: fileSpec.fileId, message: 'Файл не найден в конфиге' });
-      sendEvent('file-end', { fileId: fileSpec.fileId, exitCode: -1 });
+    const baseFile = server.files.find(f => f.id === fileSpec.fileId);
+    // fileKey — уникальный идентификатор потока в группе. Для glob-расширенных
+    // файлов один fileId порождает несколько потоков с разными overridePath,
+    // поэтому идентификатором служит fileKey (если не передан — берём fileId).
+    // В SSE-событиях поле называется fileId для обратной совместимости.
+    const fileId = fileSpec.fileKey || fileSpec.fileId;
+    if (!baseFile) {
+      sendEvent('file-error', { fileId, message: 'Файл не найден в конфиге' });
+      sendEvent('file-end', { fileId, exitCode: -1 });
       continue;
     }
+    // Применяем overridePath из glob-расширения (см. findServerAndFile).
+    const file = (fileSpec.overridePath && typeof fileSpec.overridePath === 'string' && fileSpec.overridePath.trim())
+      ? { ...baseFile, remotePath: fileSpec.overridePath.trim() }
+      : baseFile;
     const initialNum = Math.max(0, Math.min(10000, parseInt(fileSpec.initialLines) || 100));
-    const fileId = fileSpec.fileId;
 
-    // Запускаем асинхронно, но ошибки одного файла не должны валить группу.
+    if (isLocalServer(server)) {
+      // ---- Ветка локального файла (polling через fs) ----
+      (async () => {
+        const filePath = file.remotePath;
+        let stopped = false;
+        let intervalId = null;
+
+        // Регистрируем closer сразу, чтобы closeAll/closeFile могли остановить.
+        const registerCloser = () => group.closers.set(fileId, () => {
+          stopped = true;
+          if (intervalId) clearInterval(intervalId);
+        });
+        registerCloser();
+
+        sendEvent('file-start', {
+          fileId,
+          fileName: path.basename(filePath),
+          filePath,
+          serverName: server.name,
+          mode: 'live',
+          initialLines: initialNum,
+          local: true
+        });
+
+        const initLines = await readLastNLinesLocal(filePath, initialNum).catch(() => []);
+        if (!stopped && initLines.length > 0) sendEvent('file-lines', { fileId, lines: initLines });
+
+        if (stopped) return;
+
+        let currentSize = 0;
+        try { currentSize = fs.statSync(filePath).size; } catch {}
+        let trailingBuf = '';
+
+        intervalId = setInterval(() => {
+          if (stopped) return;
+          try {
+            const stat = fs.statSync(filePath);
+            if (stat.size > currentSize) {
+              const newBytes = stat.size - currentSize;
+              const chunk = Buffer.alloc(newBytes);
+              const fd = fs.openSync(filePath, 'r');
+              fs.readSync(fd, chunk, 0, newBytes, currentSize);
+              fs.closeSync(fd);
+              currentSize = stat.size;
+              trailingBuf += chunk.toString('utf-8');
+              const parts = trailingBuf.split('\n');
+              trailingBuf = parts.pop();
+              if (parts.length > 0 && !stopped) sendEvent('file-lines', { fileId, lines: parts });
+            } else if (stat.size < currentSize) {
+              currentSize = stat.size;
+              trailingBuf = '';
+            }
+          } catch {}
+        }, 250);
+
+        // Обновляем closer, теперь включая intervalId.
+        registerCloser();
+      })().catch(err => {
+        console.error(`[multi-live-local] ошибка fileId=${fileId}:`, err);
+        sendEvent('file-error', { fileId, message: String(err.message || err) });
+      });
+      continue;
+    }
+
+    // ---- SSH-ветка ----
     (async () => {
       const filePath = shellEscape(file.remotePath);
       const cmd = `tail -n ${initialNum} -F ${filePath}`;
@@ -1118,7 +1507,10 @@ app.post('/api/tail-follow-multi', async (req, res) => {
         return;
       }
 
-      group.streams.set(fileId, stream);
+      group.closers.set(fileId, () => {
+        try { stream.signal('TERM'); } catch {}
+        try { stream.close(); } catch {}
+      });
 
       sendEvent('file-start', {
         fileId,
@@ -1152,15 +1544,10 @@ app.post('/api/tail-follow-multi', async (req, res) => {
       stream.on('close', (code) => {
         if (buffer.length > 0) sendEvent('file-lines', { fileId, lines: [buffer] });
         sendEvent('file-end', { fileId, exitCode: code });
-        group.streams.delete(fileId);
-        // Если ВСЕ файлы инициализированы и группа опустела — закрываем SSE.
-        // (Опустошение во время старта не считается — тогда другие ещё запустятся.)
-        if (group.streams.size === 0 && !closed) {
-          // Проверяем, что все файлы прошли стадию инициализации
-          // (т.е. не осталось pending exec-вызовов). Грубая эвристика:
-          // даём небольшую задержку — если новых stream не появилось, закрываем.
+        group.closers.delete(fileId);
+        if (group.closers.size === 0 && !closed) {
           setTimeout(() => {
-            if (group.streams.size === 0 && !closed) {
+            if (group.closers.size === 0 && !closed) {
               sendEvent('group-end', {});
               closeAll();
             }
@@ -1191,7 +1578,7 @@ app.post('/api/tail-follow-multi/stop', (req, res) => {
     return res.json({ success: ok });
   }
   // без fileId — закрываем всю группу
-  for (const fid of Array.from(group.streams.keys())) group.closeFile(fid);
+  for (const fid of Array.from(group.closers.keys())) group.closeFile(fid);
   return res.json({ success: true });
 });
 

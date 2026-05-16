@@ -13,8 +13,7 @@ import {
   sortLogs,
   traceIdColor,
   shortTraceId,
-  serviceColor,
-  serviceIcon
+  serviceColor
 } from './utils.js';
 import { renderSparkline } from './sparkline.js';
 import { getTzOffsetMinutes } from './tz-selector.js';
@@ -33,19 +32,10 @@ export function buildServiceChips() {
     chip.style.setProperty('--service-color', serviceColor(service));
     chip.title = 'Клик: скрыть/показать логи этого сервиса';
 
-    // Иконку и подпись делаем отдельными span'ами — это позволяет CSS управлять
-    // их цветом независимо (например, гасить иконку на скрытом чипе сильнее, чем
-    // текст). Иконка скрыта от скринридеров — это чисто визуальный маркер.
-    const iconEl = document.createElement('span');
-    iconEl.className = 'service-icon';
-    iconEl.setAttribute('aria-hidden', 'true');
-    iconEl.textContent = serviceIcon(service);
-
     const labelEl = document.createElement('span');
     labelEl.className = 'service-label';
     labelEl.textContent = service;
 
-    chip.appendChild(iconEl);
     chip.appendChild(labelEl);
 
     chip.addEventListener('click', () => {
@@ -71,12 +61,18 @@ function maybeRebuildChips() {
 // ====================== Сводные индикаторы ======================
 
 export function updateOpenFilesLabel() {
-  if (state.openedFiles.length === 0) {
-    dom.openFilesLabel.textContent = 'Файлы не выбраны';
-    dom.openFilesLabel.title = '';
+  const countEl = dom.openFilesLabel.querySelector('.open-files-count');
+  const n = state.openedFiles.length;
+  if (n === 0) {
+    if (countEl) countEl.textContent = '';
+    dom.openFilesLabel.title = 'Файлы не выбраны';
+    dom.openFilesLabel.setAttribute('aria-label', 'Файлы не выбраны');
+    dom.openFilesLabel.classList.remove('has-files');
   } else {
-    dom.openFilesLabel.textContent = state.openedFiles.join(', ');
+    if (countEl) countEl.textContent = n;
     dom.openFilesLabel.title = state.openedFiles.join('\n');
+    dom.openFilesLabel.setAttribute('aria-label', `Открыто файлов: ${n}`);
+    dom.openFilesLabel.classList.add('has-files');
   }
 }
 
@@ -165,12 +161,14 @@ export function updateLiveIndicator() {
 // ====================== Баннер активной trace-трассы ======================
 
 /**
- * Устанавливает активный фильтр по traceId. Передача '' / null снимает фильтр.
+ * Устанавливает активный фильтр по traceId. Передача '' / null / undefined снимает фильтр.
  * Вызывается изнутри (клик по бейджу) и из app.js (Clear-кнопка, очистка
  * при загрузке новых файлов).
  */
 export function setTraceFilter(traceId) {
-  state.currentTraceFilter = traceId || null;
+  // Устанавливаем фильтр только если traceId это непустая строка
+  // Пустая строка, null или undefined означают "без фильтра"
+  state.currentTraceFilter = (traceId && String(traceId).trim()) || null;
   render();
 }
 
@@ -248,7 +246,8 @@ function filterLogs() {
     fromMs: dom.timeFrom.value ? new Date(dom.timeFrom.value).getTime() : null,
     toMs: dom.timeTo.value ? new Date(dom.timeTo.value).getTime() : null,
     serviceVisibility: state.serviceVisibility,
-    traceFilter: state.currentTraceFilter || null
+    // Передаем traceFilter как есть, без преобразования пустой строки в null
+    traceFilter: state.currentTraceFilter
   };
   return sortLogs(applyFilters(state.allLogs, filters), dom.sortBy.value);
 }
@@ -339,7 +338,6 @@ export function render() {
     // цвета текста. Иконка идёт отдельным span'ом — это упрощает CSS-таргетинг.
     const svc      = entry._serviceKey || '';
     const svcColor = serviceColor(svc);
-    const svcIcon  = serviceIcon(svc);
 
     // Полная временная метка идёт в нативный tooltip (`title`) — день недели,
     // время с миллисекундами, таймзона, ISO 8601, «N минут назад». Пункт 6.3.
@@ -349,7 +347,7 @@ export function render() {
     row.innerHTML = `
       <span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs, tz)}</span>
       <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
-      <span class="log-service" style="--service-color:${svcColor}" title="Сервис: ${escapeHtml(svc)}"><span class="service-icon" aria-hidden="true">${escapeHtml(svcIcon)}</span><span class="service-label">${escapeHtml(svc)}</span></span>
+      <span class="log-service" style="--service-color:${svcColor}" title="Сервис: ${escapeHtml(svc)}"><span class="service-label">${escapeHtml(svc)}</span></span>
       <span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>
       ${extraKeys.length ? `
         <div class="log-extra">

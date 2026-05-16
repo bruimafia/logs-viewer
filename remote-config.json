@@ -74,6 +74,19 @@
           "remotePath": "/var/www/services/order-service/order-service.log"
         }
       ]
+    },
+    {
+      "id": "server-1778937283309",
+      "name": "Local",
+      "files": [
+        {
+          "id": "file-1778937326635",
+          "name": "Логи",
+          "remotePath": "C:\\Users\\sbruj\\Desktop\\07\\perekop-2-server\\microservices\\*\\*.log"
+        }
+      ],
+      "type": "local",
+      "password": ""
     }
   ]
 }
