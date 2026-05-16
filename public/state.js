@@ -48,7 +48,17 @@ export const state = {
   // null или пустая строка — фильтр выключен. Строка — показываем только записи
   // с e._traceId === currentTraceFilter. Устанавливается кликом по бейджу
   // трассы в любой записи, снимается крестиком в баннере или при «Очистить все».
-  currentTraceFilter: null
+  currentTraceFilter: null,
+
+  // Кастомизация колонок (пункт 6.9). Хранит список имён полей,
+  // которые должны отображаться как отдельные колонки.
+  // По умолчанию: ['time', 'level', 'service', 'msg'] — стандартные поля.
+  // Пользователь может добавить любое extra-поле (например, 'requestId').
+  visibleColumns: ['time', 'level', 'service', 'msg'],
+
+  // Список уникальных extra-полей, обнаруженных во всех записях.
+  // Обновляется при каждой загрузке/обновлении логов.
+  discoveredExtraFields: []
 };
 
 // DOM-ссылки. Модуль грузится через <script type="module">, который
@@ -110,5 +120,11 @@ export const dom = {
   sparklineTooltip: document.getElementById('sparklineTooltip'),
 
   // Контейнер toast-уведомлений (пункт 6.1)
-  toastContainer: document.getElementById('toastContainer')
+  toastContainer: document.getElementById('toastContainer'),
+
+  // Кастомизация колонок (пункт 6.9)
+  columnCustomizerToggle: document.getElementById('columnCustomizerToggle'),
+  columnCustomizerDropdown: document.getElementById('columnCustomizerDropdown'),
+  columnCustomizerList: document.getElementById('columnCustomizerList'),
+  columnCustomizerReset: document.getElementById('columnCustomizerReset')
 };

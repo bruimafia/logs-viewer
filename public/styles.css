@@ -1844,3 +1844,142 @@ mark.search-match {
   font-size: 10px;
   padding: 2px 20px 2px 6px;
 }
+
+/* ============================================================
+ * Кастомизация колонок (пункт 6.9).
+ * Кнопка «Колонки ▾» и выпадающий список чекбоксов.
+ * ============================================================ */
+
+.column-customizer-wrap {
+  position: relative;
+  margin-left: 4px;
+}
+
+.column-customizer-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+.column-customizer-toggle:hover {
+  border-color: var(--info);
+  color: var(--info);
+}
+
+/* Выпадающий дропдаун с чекбоксами. */
+.column-customizer-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  max-width: 280px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--modal-shadow);
+  z-index: 200;
+  padding: 8px;
+}
+
+.column-customizer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.column-customizer-reset {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: color 0.12s, background 0.12s;
+}
+.column-customizer-reset:hover {
+  color: var(--error);
+  background: var(--error-tint);
+}
+
+.column-customizer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Чекбоксы колонок */
+.column-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+.column-check:hover {
+  background: var(--row-subtle);
+}
+.column-check input[type="checkbox"] {
+  accent-color: var(--info);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.column-check:has(input:checked) {
+  color: var(--info);
+}
+
+/* Стиль для extra-полей — выделяем чуть иначе */
+.column-check.extra-field-label {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ============================================================
+ * Стили для extra-полей, вынесенных как отдельные колонки.
+ * Они рендерятся как <span class="log-extra-field"> с data-field.
+ * ============================================================ */
+
+.log-extra-field {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--row-subtle);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+/* Компактный режим — extra-поля мельче */
+:root[data-compact="true"] .log-extra-field {
+  font-size: 10px;
+  padding: 0 3px;
+}

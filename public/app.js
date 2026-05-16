@@ -6,7 +6,7 @@
 //  • навешивание глобальных обработчиков индикатора LIVE.
 
 import { state, dom } from './state.js';
-import { parseLogLine, getQuickRange, msToDatetimeLocalValue } from './utils.js';
+import { parseLogLine, getQuickRange, msToDatetimeLocalValue, escapeHtml } from './utils.js';
 import {
   render,
   updateUI,
@@ -245,6 +245,134 @@ if (dom.compactModeCheckbox) {
   });
 }
 
+// ====================== Кастомизация колонок (пункт 6.9) ======================
+
+const DEFAULT_COLUMNS = ['time', 'level', 'service', 'msg'];
+const STORAGE_KEY = 'log-viewer-columns';
+
+// Загружаем сохранённые колонки из localStorage при старте.
+function loadColumnSettings() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        state.visibleColumns = parsed;
+      }
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// Сохраняем текущие колонки в localStorage.
+function saveColumnSettings() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.visibleColumns));
+  } catch (e) { /* ignore */ }
+}
+
+// Стандартные колонки с читаемыми ярлыками.
+const STANDARD_COLUMNS = [
+  { key: 'time',    label: 'Время' },
+  { key: 'level',   label: 'Уровень' },
+  { key: 'service', label: 'Сервис' },
+  { key: 'msg',     label: 'Сообщение' }
+];
+
+/**
+ * Пересобирает список чекбоксов в дропдауне «Колонки».
+ * Вызывается при открытии дропдауна и после добавления новых extra-полей.
+ */
+function updateColumnCustomizerList() {
+  if (!dom.columnCustomizerList) return;
+
+  // Собираем все доступные колонки: стандартные + discovered extra
+  const extraFields = state.discoveredExtraFields || [];
+  const allColumns = [
+    ...STANDARD_COLUMNS,
+    ...extraFields.map(key => ({ key, label: key }))
+  ];
+
+  dom.columnCustomizerList.innerHTML = allColumns.map(col => {
+    const checked = state.visibleColumns.includes(col.key) ? 'checked' : '';
+    return `
+      <label class="column-check">
+        <input type="checkbox" value="${escapeHtml(col.key)}" ${checked}>
+        <span>${escapeHtml(col.label)}</span>
+      </label>
+    `;
+  }).join('');
+
+  // Обработчик на каждый чекбокс
+  dom.columnCustomizerList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const colKey = cb.value;
+      if (cb.checked) {
+        if (!state.visibleColumns.includes(colKey)) {
+          // Вставляем после стандартных колонок (time, level, service, msg),
+          // чтобы extra-поля шли после основных
+          const insertAfter = Math.max(
+            STANDARD_COLUMNS.findIndex(c => c.key === colKey),
+            0
+          );
+          const lastStandard = state.visibleColumns.findIndex(
+            (k, i) => i >= insertAfter && STANDARD_COLUMNS.some(s => s.key === k)
+          );
+          if (lastStandard === -1) {
+            state.visibleColumns.push(colKey);
+          } else {
+            state.visibleColumns.splice(lastStandard + 1, 0, colKey);
+          }
+        }
+      } else {
+        // Нельзя скрыть все колонки — хотя бы msg остаётся
+        if (state.visibleColumns.length > 1) {
+          state.visibleColumns = state.visibleColumns.filter(k => k !== colKey);
+        } else {
+          cb.checked = true; // реvert
+          return;
+        }
+      }
+      saveColumnSettings();
+      render();
+    });
+  });
+}
+
+// Открытие/закрытие дропдауна
+dom.columnCustomizerToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const hidden = dom.columnCustomizerDropdown.hidden;
+  if (hidden) {
+    updateColumnCustomizerList();
+    dom.columnCustomizerDropdown.hidden = false;
+    dom.columnCustomizerToggle.textContent = 'Колонки ▲';
+  } else {
+    dom.columnCustomizerDropdown.hidden = true;
+    dom.columnCustomizerToggle.textContent = 'Колонки ▾';
+  }
+});
+
+// Сброс к стандартным колонкам
+if (dom.columnCustomizerReset) {
+  dom.columnCustomizerReset.addEventListener('click', () => {
+    state.visibleColumns = [...DEFAULT_COLUMNS];
+    saveColumnSettings();
+    updateColumnCustomizerList();
+    render();
+  });
+}
+
+// Закрытие по клику вне дропдауна
+document.addEventListener('click', (e) => {
+  if (!dom.columnCustomizerToggle.contains(e.target) &&
+      !dom.columnCustomizerDropdown.contains(e.target)) {
+    dom.columnCustomizerDropdown.hidden = true;
+    if (dom.columnCustomizerToggle) dom.columnCustomizerToggle.textContent = 'Колонки ▾';
+  }
+});
+
 // ====================== Старт ======================
+
+loadColumnSettings();
 
 render();

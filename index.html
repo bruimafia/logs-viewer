@@ -159,6 +159,20 @@
         <span class="services-label">Сервисы:</span>
         <div class="services-filter" id="servicesFilter"></div>
       </div>
+      <!-- Кастомизация колонок (пункт 6.9). Показываем чекбоксы
+           для стандартных колонок + обнаруженных extra-полей. -->
+      <div class="column-customizer-wrap">
+        <button type="button" class="column-customizer-toggle" id="columnCustomizerToggle" title="Настроить колонки">
+          Колонки ▾
+        </button>
+        <div class="column-customizer-dropdown" id="columnCustomizerDropdown" hidden>
+          <div class="column-customizer-header">
+            <span>Колонки</span>
+            <button type="button" class="column-customizer-reset" id="columnCustomizerReset" title="Сбросить">Сброс</button>
+          </div>
+          <div class="column-customizer-list" id="columnCustomizerList"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Мини-спарклайн со статистикой по уровням (пункт 3.4 плана улучшений).

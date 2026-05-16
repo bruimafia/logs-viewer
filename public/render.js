@@ -235,6 +235,20 @@ export function addLinesToLogs(lines, displayName) {
   Object.keys(state.fileNames).forEach(s => {
     if (state.serviceVisibility[s] === undefined) state.serviceVisibility[s] = true;
   });
+
+  // Собираем все extra-поля из новых записей (пункт 6.9).
+  // Исключаем стандартные поля и системные (_*).
+  const knownStandard = new Set(['time', 'level', 'msg', 'service', 'source', '_timeMs', '_sourceName', '_serviceKey', '_fileName', '_traceId']);
+  for (const entry of added) {
+    for (const key of Object.keys(entry)) {
+      if (!knownStandard.has(key) && !key.startsWith('_')) {
+        if (!state.discoveredExtraFields.includes(key)) {
+          state.discoveredExtraFields.push(key);
+        }
+      }
+    }
+  }
+
   return added;
 }
 
@@ -301,6 +315,8 @@ export function render() {
 
   const fragment = document.createDocumentFragment();
   const tz = getTzOffsetMinutes();
+  const visibleCols = state.visibleColumns;
+
   list.forEach(entry => {
     const row = document.createElement('div');
     row.className = `log-entry level-${(entry.level || 'INFO').toUpperCase()}`;
@@ -346,11 +362,38 @@ export function render() {
     // formatTimeFull возвращает '' для нулевого/невалидного времени —
     // тогда атрибут попадёт пустым, и браузер подсказку не покажет.
     const timeFullTitle = formatTimeFull(entry._timeMs, undefined, tz);
+
+    // Собираем колонки на основе visibleColumns (пункт 6.9).
+    // Каждая колонка — отдельный <span> с классом column-<name>.
+    // Extra-поля рендерятся как колонки с содержимым highlightMatch или highlightJson.
+    let columnsHtml = '';
+    for (const colName of visibleCols) {
+      switch (colName) {
+        case 'time':
+          columnsHtml += `<span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs, tz)}</span>`;
+          break;
+        case 'level':
+          columnsHtml += `<span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>`;
+          break;
+        case 'service':
+          columnsHtml += `<span class="log-service" style="--service-color:${svcColor}" title="Сервис: ${escapeHtml(svc)}"><span class="service-icon" aria-hidden="true">${escapeHtml(svcIcon)}</span><span class="service-label">${escapeHtml(svc)}</span></span>`;
+          break;
+        case 'msg':
+          columnsHtml += `<span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>`;
+          break;
+        default:
+          // extra-поле — выносим как отдельную колонку
+          if (extra[colName] !== undefined) {
+            const val = extra[colName];
+            const valStr = typeof val === 'object' ? JSON.stringify(val) : String(val);
+            columnsHtml += `<span class="log-extra-field" data-field="${escapeHtml(colName)}" title="${escapeHtml(colName)}: ${escapeHtml(valStr)}">${typeof val === 'object' ? highlightJson(valStr, search) : highlightMatch(valStr, search)}</span>`;
+          }
+          break;
+      }
+    }
+
     row.innerHTML = `
-      <span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs, tz)}</span>
-      <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
-      <span class="log-service" style="--service-color:${svcColor}" title="Сервис: ${escapeHtml(svc)}"><span class="service-icon" aria-hidden="true">${escapeHtml(svcIcon)}</span><span class="service-label">${escapeHtml(svc)}</span></span>
-      <span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>
+      ${columnsHtml}
       ${extraKeys.length ? `
         <div class="log-extra">
           <details>
