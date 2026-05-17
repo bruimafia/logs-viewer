@@ -452,8 +452,11 @@ export function getQuickRange(preset, nowMs) {
   switch (preset) {
     case '5m':  return { fromMs: now - 5 * minute,  toMs: now };
     case '15m': return { fromMs: now - 15 * minute, toMs: now };
+    case '30m': return { fromMs: now - 30 * minute, toMs: now };
     case '1h':  return { fromMs: now - hour,        toMs: now };
+    case '3h':  return { fromMs: now - 3 * hour,    toMs: now };
     case '6h':  return { fromMs: now - 6 * hour,    toMs: now };
+    case '12h': return { fromMs: now - 12 * hour,   toMs: now };
     case '24h': return { fromMs: now - day,         toMs: now };
     case '7d':  return { fromMs: now - 7 * day,     toMs: now };
     case 'today': {

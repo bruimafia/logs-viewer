@@ -82,7 +82,6 @@ export function updateLoadMoreVisibility() {
     const filesArr = Array.from(state.paginatedFiles.values());
     const totalLoaded = filesArr.reduce((acc, f) => acc + f.totalLoaded, 0);
     const filesText = filesArr.length === 1 ? '1 файл' : `${filesArr.length} файлов`;
-    dom.loadMoreInfo.textContent = `(загружено ${totalLoaded} строк из ${filesText})`;
   } else {
     dom.loadMoreWrap.classList.remove('visible');
   }

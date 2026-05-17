@@ -87,6 +87,12 @@
       ],
       "type": "local",
       "password": ""
+    },
+    {
+      "id": "server-1779027746501",
+      "name": "dfgdfg",
+      "files": [],
+      "type": "local"
     }
   ]
 }
