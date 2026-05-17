@@ -61,38 +61,17 @@
       ]
     },
     {
-      "id": "s2",
-      "name": "Production Server",
-      "host": "192.168.185.8",
-      "port": 22,
-      "username": "user",
-      "password": "P@ssw0rd",
+      "id": "server-1779029537156",
+      "name": "Localhost",
       "files": [
         {
-          "id": "s2f1",
-          "name": "Order Service Log",
-          "remotePath": "/var/www/services/order-service/order-service.log"
-        }
-      ]
-    },
-    {
-      "id": "server-1778937283309",
-      "name": "Local",
-      "files": [
-        {
-          "id": "file-1778937326635",
-          "name": "Логи",
+          "id": "file-1779029556524",
+          "name": "Desktop",
           "remotePath": "C:\\Users\\sbruj\\Desktop\\07\\perekop-2-server\\microservices\\*\\*.log"
         }
       ],
       "type": "local",
       "password": ""
-    },
-    {
-      "id": "server-1779027746501",
-      "name": "dfgdfg",
-      "files": [],
-      "type": "local"
     }
   ]
 }
