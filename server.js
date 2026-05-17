@@ -48,7 +48,7 @@ function shellEscape(s) {
 }
 
 /**
- * Строит prefix-команду grep'а для серверного поиска (пункт 5.3 плана улучшений).
+ * Строит prefix-команду grep'а для серверного поиска.
  * Возвращает строку вида `grep -a -F -i -e 'pattern'` или null, если pattern пуст.
  *
  *   options.regex            — true → -E (ERE: . * + ? ( ) | [ ] { } ^ $ \),
@@ -70,7 +70,7 @@ function buildGrepPrefix(pattern, options = {}) {
 }
 
 /**
- * Разбирает logLevels из тела HTTP-запроса (пункт 5.2).
+ * Разбирает logLevels из тела HTTP-запроса.
  * Принимает body.logLevels — массив строк уровней ['ERROR','WARN'].
  * Возвращает { prefix, hasFilter }:
  *   prefix    — готовая часть grep-команды, либо null
@@ -364,7 +364,7 @@ function getLogTimeMs(line) {
  * Находит сервер и файл по идентификаторам.
  *
  * Если передан overridePath — возвращает копию файла с подменённым remotePath.
- * Это используется для glob-расширения (пункт 7.2): запись с glob-паттерном
+ * Это используется для glob-расширения: запись с glob-паттерном
  * раскрывается на стороне фронтенда в несколько виртуальных файлов, и при
  * загрузке каждый из них приходит с конкретным путём, который и нужно
  * подставить вместо исходного паттерна.
@@ -446,7 +446,7 @@ app.post('/api/test-connection-by-id', async (req, res) => {
   }
 });
 
-// ====================== API: раскрытие glob-паттернов (пункт 7.2) ======================
+// API: раскрытие glob-паттернов
 
 /**
  * Раскрывает glob-паттерн в список реальных файлов через SSH exec.
@@ -745,7 +745,7 @@ app.post('/api/test-connection', async (req, res) => {
 // Используется для режима "По диапазону дат"
 
 /**
- * Реализация Range-режима при включённом серверном grep (пункт 5.3):
+ * Реализация Range-режима при включённом серверном grep:
  * вместо потокового SFTP-чтения всего файла запускаем `grep ... file`
  * через SSH exec. По сети передаются только совпавшие строки —
  * радикальное ускорение на больших файлах.
@@ -858,7 +858,7 @@ async function streamFileViaGrep({ res, sendEvent, server, file, grepPrefix, fro
 }
 
 /**
- * Реализация Range-режима при фильтре по уровням (пункт 5.2).
+ * Реализация Range-режима при фильтре по уровням.
  * Через SSH exec делаем grep по уровням, затем применяем фильтр по дате
  * (date-фильтр JSON-aware, grep его подменить не может).
  *
@@ -991,7 +991,7 @@ app.post('/api/stream-file', async (req, res) => {
   if (found.error) return res.status(404).json({ error: found.error });
   const { server, file } = found;
 
-  // Серверный grep (пункт 5.3): при заполненном поле «Содержит» уходим
+  // Серверный grep: при заполненном поле «Содержит» уходим
   // в отдельный путь через SSH exec — это даёт реальную экономию трафика
   // на больших файлах, т.к. SFTP стянул бы файл целиком, а grep отдаёт
   // только совпадения.
@@ -1116,7 +1116,7 @@ app.post('/api/tail-file', async (req, res) => {
   if (found.error) return res.status(404).json({ error: found.error });
   const { server, file } = found;
 
-  // Серверный grep (пункт 5.3): опциональный пре-фильтр перед tail.
+  // Серверный grep: опциональный пре-фильтр перед tail.
   const { prefix: grepPrefix, hasFilter: hasGrep } = parseGrepFilter(req.body);
 
   setSseHeaders(res);

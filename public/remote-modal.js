@@ -258,7 +258,7 @@ function renderFilesTab() {
       </label>
     </div>
 
-    <!-- Серверный поиск (пункт 5.3) — общее поле для режимов «Хвост» и «Диапазон» -->
+    <!-- Серверный поиск — общее поле для режимов «Хвост» и «Диапазон» -->
     <div class="mode-config mode-config-shared" id="config-shared-grep">
       <span class="mode-config-label">Содержит (опционально) — серверный grep до загрузки</span>
       <div class="mode-config-row mode-config-row-grep">
@@ -302,7 +302,7 @@ function renderFilesTab() {
         <label>До: <input type="datetime-local" id="remoteDateTo" step="1"></label>
       </div>
       <div class="mode-config-row level-filter-remote">
-        <span class="mode-config-label" style="margin-bottom: 4px;">Уровни (фильтрация на сервере, пункт 5.2):</span>
+        <span class="mode-config-label" style="margin-bottom: 4px;">Уровни (фильтрация на сервере):</span>
         <div class="remote-level-checks">
           <label class="remote-level-check"><input type="checkbox" id="remoteLevelError" value="ERROR" checked> ERROR</label>
           <label class="remote-level-check"><input type="checkbox" id="remoteLevelWarn" value="WARN" checked> WARN</label>

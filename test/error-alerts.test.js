@@ -1,5 +1,5 @@
 // Unit-тесты чистых функций из public/error-alerts.js
-// (пункты 3.2 и 3.3 плана улучшений: уведомления и звук на ERROR).
+// (уведомления и звук на ERROR).
 //
 // Модуль трогает window/document/Notification/AudioContext/localStorage,
 // которых в Node нет. Поэтому ВЫНОСИМ из него чистые функции, которые

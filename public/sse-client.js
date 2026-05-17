@@ -107,7 +107,7 @@ export function updateProgress(container, fileName, status, percent, indetermina
 }
 
 /**
- * Читает опции серверного grep-фильтра из модалки (пункт 5.3).
+ * Читает опции серверного grep-фильтра из модалки.
  * Возвращает объект с полями grepPattern/grepRegex/grepCaseInsensitive,
  * готовый для подмешивания в тело SSE-запроса через spread.
  *
@@ -130,7 +130,7 @@ function getGrepOptions() {
 }
 
 /**
- * Читает фильтр по уровням из модалки (пункт 5.2).
+ * Читает фильтр по уровням из модалки.
  * Возвращает массив выбранных уровней или пустой массив,
  * если все сняты (сервер примет пустой массив и вернёт все уровни).
  *
@@ -621,8 +621,8 @@ async function runLiveGroup(server, files, initialLines, group) {
           setLiveLoadingItemStatus(st.key, 'success', 'Подключено');
         }
 
-        // Пункт 3.1: если активна пауза — копим строки в буфере, в allLogs
-        // не пушаем. SSE-соединение и tail -F на сервере остаются живыми;
+        // Если активна пауза — копим строки в буфере, в allLogs не пушаем.
+        // SSE-соединение и tail -F на сервере остаются живыми;
         // строки попадут в общий список через resumeLiveStreams().
         if (state.liveStreamPaused) {
           state.livePausedBuffer.push({ lines: data.lines, displayName: st.displayName });
@@ -634,9 +634,8 @@ async function runLiveGroup(server, files, initialLines, group) {
         if (newEntries.length > 0) {
           trimAllLogsIfNeeded();
           scheduleRender();
-          // Пункты 3.2, 3.3: оповещение об ERROR в live. Пропускаем
-          // первый батч (исторический tail) — иначе при подключении к
-          // активному ошибочному файлу пользователя сразу оглушит.
+          // Оповещение об ERROR в live. Пропускаем первый батч (исторический tail),
+          // иначе при подключении к активному ошибочному файлу пользователя сразу оглушит.
           if (!isInitialBatch) {
             handleNewLiveEntries(newEntries);
           }
@@ -748,7 +747,7 @@ export function stopAllLive() {
     try { group.abortController.abort(); } catch (e) {}
   }
   state.liveStreams.clear();
-  // Пункт 3.1: при полной остановке отбрасываем накопленный буфер —
+  // При полной остановке отбрасываем накопленный буфер —
   // пользователь явно прекратил наблюдение, лишних строк показывать не нужно.
   state.liveStreamPaused = false;
   state.livePausedBuffer = [];
@@ -766,7 +765,7 @@ function resetAllLogs() {
   state.paginatedFiles.clear();
 }
 
-// ====================== Пауза / возобновление (пункт 3.1) ======================
+// Пауза / возобновление live-потоков
 // При паузе клиент перестаёт добавлять входящие строки в allLogs,
 // но SSE-соединения и серверные `tail -F` процессы продолжают работать —
 // строки копятся в state.livePausedBuffer и применяются на resume.

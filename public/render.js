@@ -25,7 +25,7 @@ export function buildServiceChips() {
   Object.keys(state.fileNames).sort().forEach(service => {
     const chip = document.createElement('span');
     chip.className = 'service-chip' + (state.serviceVisibility[service] ? '' : ' hidden');
-    // Цвет сервиса передаётся в CSS как переменная (пункт 6.5 плана улучшений).
+    // Цвет сервиса передаётся в CSS как переменная.
     // Это позволяет правилам styles.css использовать color-mix() и автоматически
     // подстраиваться под тёмную/светлую тему: фон — лёгкий тинт, граница и текст —
     // того же цветового тона, но плотнее.
@@ -96,7 +96,7 @@ let stopLiveStreamFn = null;
 export function setStopLiveStreamHandler(fn) { stopLiveStreamFn = fn; }
 
 export function updateLiveIndicator() {
-  // Пункт 3.1: если все live-потоки закончились естественным образом,
+  // Если все live-потоки закончились естественным образом,
   // но пауза была включена (или в буфере что-то осталось) — применяем
   // буфер и сбрасываем флаг. Иначе индикатор спрячется (size === 0)
   // и нажать «Возобновить» будет нечем — буфер останется висеть в памяти.
@@ -118,7 +118,7 @@ export function updateLiveIndicator() {
     dom.liveIndicator.classList.add('active');
     dom.liveCount.textContent = state.liveStreams.size;
 
-    // Пункт 3.1: класс .paused и текст кнопки «Пауза»/«Возобновить».
+    // Класс .paused и текст кнопки «Пауза»/«Возобновить».
     const paused = state.liveStreamPaused;
     dom.liveIndicator.classList.toggle('paused', paused);
     if (dom.pauseLiveBtn) {
@@ -264,7 +264,7 @@ export function render() {
   maybeRebuildChips();
   // Обновляем баннер активной трассы.
   updateTraceFilterBanner();
-  // Обновляем мини-спарклайн (пункт 3.4). Дроссель через rAF — несколько
+  // Обновляем мини-спарклайн. Дроссель через rAF — несколько
   // вызовов подряд при live-batch + render схлопнутся в один кадр.
   renderSparkline();
 
@@ -333,14 +333,14 @@ export function render() {
         `${escapeHtml(short)}</button> `;
     }
 
-    // Цвет и иконка сервиса (пункт 6.5 плана улучшений). Переменная
+    // Цвет и иконка сервиса. Переменная
     // --service-color используется правилами styles.css для фона/границы/
     // цвета текста. Иконка идёт отдельным span'ом — это упрощает CSS-таргетинг.
     const svc      = entry._serviceKey || '';
     const svcColor = serviceColor(svc);
 
     // Полная временная метка идёт в нативный tooltip (`title`) — день недели,
-    // время с миллисекундами, таймзона, ISO 8601, «N минут назад». Пункт 6.3.
+    // время с миллисекундами, таймзона, ISO 8601, «N минут назад».
     // formatTimeFull возвращает '' для нулевого/невалидного времени —
     // тогда атрибут попадёт пустым, и браузер подсказку не покажет.
     const timeFullTitle = formatTimeFull(entry._timeMs, undefined, tz);

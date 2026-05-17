@@ -1,95 +1,87 @@
-// public/sparkline.js
-//
-// Мини-спарклайн со статистикой по уровням (пункт 3.4 плана улучшений).
-// Узкая полоса под тулбаром, показывающая гистограмму количества записей
-// в state.allLogs по уровням (ERROR / WARN / INFO / DEBUG), сгруппированных
-// по бинам времени в выбранном окне. Помогает увидеть всплеск — особенно
-// в live-режиме.
-//
-// Особенности реализации:
-//   • Без зависимостей. Чистый <canvas> 2D, HiDPI-friendly: размер канваса
-//     в пикселях устройства считается по devicePixelRatio при каждом
-//     ресайзе, ctx масштабируется через setTransform.
-//   • Цвета берутся из CSS-переменных (getComputedStyle), поэтому смена
-//     темы (data-theme) не требует никакой пересборки палитры —
-//     MutationObserver на <html> перерисовывает спарклайн.
-//   • Источник данных — НЕ фильтрованный state.allLogs: цель спарклайна
-//     в том, чтобы дать общий обзор и подсветить, что прячут фильтры
-//     (типичный сценарий: «я скрыл DEBUG, но в логах сейчас всплеск
-//     DEBUG-сообщений — это нормально?»). Уровневые фильтры применять
-//     не нужно.
-//   • Клик по бину выставляет timeFrom/timeTo на границы бина (с малым
-//     запасом по краям) — удобный UX-зум, который автоматически
-//     заполняет существующие поля «С / До».
-//   • Дроссель через requestAnimationFrame: несколько вызовов
-//     renderSparkline() подряд (например, при live-batch + render)
-//     схлопываются в один кадр.
-//   • В live-режиме правый край окна — Date.now(), окно «едет» вправо
-//     с шагом 5 секунд через setInterval. Без этого пустота справа
-//     росла бы между приходом батчей.
-//
-// Зависимости от других модулей: state (allLogs, liveStreams), dom
-// (ссылки на новые HTML-элементы), msToDatetimeLocalValue из utils
-// (для записи Date в значение datetime-local input'а).
+/**
+ * Мини-спарклайн со статистикой по уровням логов.
+ * Узкая полоса под тулбаром, показывающая гистограмму количества записей
+ * в state.allLogs по уровням (ERROR / WARN / INFO / DEBUG), сгруппированных
+ * по бинам времени в выбранном окне. Помогает увидеть всплеск — особенно
+ * в live-режиме.
+ */
+/**
+ * Особенности реализации:
+ *   • Без зависимостей. Чистый <canvas> 2D, HiDPI-friendly: размер канваса
+ *     в пикселях устройства считается по devicePixelRatio при каждом
+ *     ресайзе, ctx масштабируется через setTransform.
+ *   • Цвета берутся из CSS-переменных (getComputedStyle), поэтому смена
+ *     темы (data-theme) не требует никакой пересборки палитры —
+ *     MutationObserver на <html> перерисовывает спарклайн.
+ *   • Источник данных — НЕ фильтрованный state.allLogs: цель спарклайна
+ *     в том, чтобы дать общий обзор и подсветить, что прячут фильтры
+ *     (типичный сценарий: «я скрыл DEBUG, но в логах сейчас всплеск
+ *     DEBUG-сообщений — это нормально?»).
+ *   • Клик по бину выставляет timeFrom/timeTo на границы бина (с малым
+ *     запасом по краям) — удобный UX-зум, который автоматически
+ *     заполняет существующие поля «С / До».
+ *   • Дроссель через requestAnimationFrame: несколько вызовов
+ *     renderSparkline() подряд (например, при live-batch + render)
+ *     схлопываются в один кадр.
+ *   • В live-режиме правый край окна — Date.now(), окно «едет» вправо
+ *     с шагом 5 секунд через setInterval. Без этого пустота справа
+ *     росла бы между приходом батчей.
+ */
 
 import { state, dom } from './state.js';
 import { msToDatetimeLocalValue } from './utils.js';
 
 // ===================== Константы =====================
 
-// Размер окна по умолчанию (мс) — 30 минут. Перечень доступных значений
-// задан в <select id="sparklineWindow"> в index.html; здесь — только
-// дефолт, который применится при первом запуске, пока пользователь
-// не выбрал ничего сам.
+// Размер окна по умолчанию (мс) — 30 минут. Полный перечень доступных
+// значений задан в <select id="sparklineWindow"> в index.html.
 const DEFAULT_WINDOW_MS = 30 * 60 * 1000;
 
-// Ключи localStorage для запоминания пользовательских настроек.
+// Ключи localStorage для сохранения пользовательских настроек
 const LS_KEY_WINDOW    = 'sparkline:windowMs';
-const LS_KEY_COLLAPSED = 'sparkline:collapsed'; // '1' — свёрнут (видна только шапка), иначе развёрнут
+const LS_KEY_COLLAPSED = 'sparkline:collapsed';
 
-// Целевое количество бинов на канвасе. Делается небольшим и фиксированным,
-// чтобы бары были заметно широкими (по бару легче попасть курсором) и
-// чтобы внешний вид не «прыгал» при ресайзе окна.
+// Целевое количество бинов на канвасе. Небольшое фиксированное значение
+// обеспечивает широкие бары (легче попасть курсором) и стабильный внешний
+// вид при ресайзе окна.
 const BIN_COUNT = 60;
 
-// Высота канваса в CSS-пикселях. Намеренно небольшая — пункт 3.4
-// называет «узкий канвас», и мы не должны отъедать вертикальное место
-// у основного списка логов.
+// Высота канваса в CSS-пикселях. Намеренно небольшая, чтобы не отнимать
+// вертикальное место у основного списка логов.
 const CANVAS_CSS_HEIGHT = 44;
 
-// Порядок укладки уровней в стэке. Снизу-вверх: DEBUG → INFO → WARN → ERROR.
-// ERROR оказывается визуально сверху — самый «громкий» класс,
-// его всплеск должен мгновенно бросаться в глаза.
+// Порядок укладки уровней в стэке снизу-вверх. ERROR визуально сверху —
+// самый «громкий» класс, его всплеск должен мгновенно бросаться в глаза.
 const LEVELS_BOTTOM_UP = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
 
-// Период автотика в live-режиме (мс). Раз в столько секунд окно
-// сдвигается, даже если новых записей не приходило.
+// Период автотика в live-режиме (мс). Окно сдвигается даже без новых записей.
 const LIVE_TICK_MS = 5000;
 
 // ===================== Внутреннее состояние модуля =====================
 
-// Кешированный 2D-контекст. Перепривязывается при каждом resizeCanvas()
-// (после setTransform), поэтому достаточно хранить ссылку.
+// Кешированный 2D-контекст канваса
 let ctx = null;
 
-// Палитра — пересчитывается из CSS-переменных при каждой отрисовке.
-// Лёгкая операция (4–6 getPropertyValue), оптимизировать незачем.
+// Палитра цветов из CSS-переменных. Пересчитывается при каждой отрисовке.
 let palette = null;
 
-// Токен запланированного rAF. null — никакой кадр не ждёт, можно ставить.
+// Токен запланированного requestAnimationFrame. null = рендер не ожидается.
 let rafToken = null;
 
-// Состояние последнего отрисованного кадра — нужно тултипу и обработчику
-// клика, чтобы не пересчитывать биннинг при каждом mousemove.
-let lastBins = null;            // массив { t0, t1, counts:{LEVEL:n}, total }
+// Состояние последнего отрисованного кадра для тултипа и обработчика клика
+let lastBins = null;
 let lastWindowMs = DEFAULT_WINDOW_MS;
 
 // ===================== Палитра / тема =====================
 
+/**
+ * Читает цвета из CSS-переменных документа.
+ * Дефолтные значения соответствуют тёмной теме на случай, если CSS ещё не загрузился.
+ * 
+ * @returns {Object} Палитра с цветами для уровней и границ
+ */
 function readPalette() {
   const cs = getComputedStyle(document.documentElement);
-  // Дефолтные значения — на случай, если CSS ещё не дозагрузился.
-  // Соответствуют тёмной теме из styles.css.
   return {
     ERROR:  (cs.getPropertyValue('--error')  || '').trim() || '#f85149',
     WARN:   (cs.getPropertyValue('--warn')   || '').trim() || '#d29922',
@@ -102,13 +94,13 @@ function readPalette() {
 // ===================== HiDPI-ресайз канваса =====================
 
 /**
- * Приводит .width/.height канваса в соответствие с текущей шириной
- * контейнера и devicePixelRatio. Возвращает контекст и CSS-размеры,
- * либо null, если канвас не вмонтирован.
- *
- * Перепривязываем .width/.height ТОЛЬКО при реальном изменении —
- * иначе всякий раз пропадало бы сглаживание и появлялось бы лёгкое
- * мигание при перерисовке внутри одного кадра.
+ * Приводит размеры канваса в соответствие с текущей шириной контейнера
+ * и devicePixelRatio для поддержки HiDPI-дисплеев.
+ * 
+ * Перепривязываем .width/.height только при реальном изменении размеров,
+ * чтобы избежать потери сглаживания и мигания при перерисовке.
+ * 
+ * @returns {Object|null} Объект с контекстом и CSS-размерами, или null
  */
 function resizeCanvas() {
   const c = dom.sparklineCanvas;
@@ -117,8 +109,6 @@ function resizeCanvas() {
   const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
   const cssW = Math.max(0, Math.floor(rect.width));
   const cssH = CANVAS_CSS_HEIGHT;
-  // Если контейнер ещё не растянулся (нулевая ширина) — не пытаемся
-  // ничего рисовать, дождёмся следующего вызова.
   if (cssW === 0) return null;
 
   if (c.width !== cssW * dpr || c.height !== cssH * dpr) {
@@ -134,18 +124,14 @@ function resizeCanvas() {
 // ===================== Биннинг по уровням =====================
 
 /**
- * Разносит логи по BIN_COUNT интервалам в окне [endMs - windowMs; endMs).
- * Возвращает массив бинов с раскладкой по уровням и максимальное
- * число записей в одном бине — оно станет вертикальным масштабом.
- *
- * Записи без времени (_timeMs === 0) пропускаем — их позиция на
- * временной оси неопределена. Уровни, которых нет в дефолтной четвёрке,
- * приклеиваются к INFO (логичнее всего — это «прочее»).
- *
- * @param {Array} logs       state.allLogs
- * @param {number} windowMs  длина окна в мс
- * @param {number} endMs     правая граница окна (исключительно)
- * @returns {{bins: Array, max: number}}
+ * Распределяет логи по временным интервалам (бинам) с подсчётом по уровням.
+ * Записи без времени (_timeMs === 0) пропускаются. Неизвестные уровни
+ * приклеиваются к INFO.
+ * 
+ * @param {Array} logs - Массив записей логов (state.allLogs)
+ * @param {number} windowMs - Длина временного окна в миллисекундах
+ * @param {number} endMs - Правая граница окна (исключительно)
+ * @returns {{bins: Array, max: number}} Массив бинов и максимальное количество
  */
 function binByLevel(logs, windowMs, endMs) {
   const startMs = endMs - windowMs;
@@ -165,8 +151,7 @@ function binByLevel(logs, windowMs, endMs) {
     if (!t) continue;
     if (t < startMs || t >= endMs) continue;
     let idx = Math.floor((t - startMs) / binMs);
-    // Численная пограничная страховка: при t === endMs - epsilon
-    // idx может дать BIN_COUNT.
+    // Страховка от пограничных случаев с плавающей точкой
     if (idx < 0) idx = 0;
     if (idx >= BIN_COUNT) idx = BIN_COUNT - 1;
     const lvl = (e.level || 'INFO').toUpperCase();
@@ -180,36 +165,40 @@ function binByLevel(logs, windowMs, endMs) {
 
 // ===================== Отрисовка канваса =====================
 
+/**
+ * Отрисовывает бары спарклайна на канвасе.
+ * 
+ * @param {Array} bins - Массив бинов с данными
+ * @param {number} max - Максимальное значение для масштабирования
+ * @param {number} cssW - Ширина канваса в CSS-пикселях
+ * @param {number} cssH - Высота канваса в CSS-пикселях
+ */
 function paint(bins, max, cssW, cssH) {
   const cx = ctx;
   cx.clearRect(0, 0, cssW, cssH);
 
-  // Тонкая базовая линия снизу — визуально «прижимает» бары и сглаживает
-  // ощущение пустоты, когда логов мало.
+  // Базовая линия снизу визуально «прижимает» бары
   cx.fillStyle = palette.border;
   cx.fillRect(0, cssH - 1, cssW, 1);
 
   if (max === 0) return;
 
   const barSlot = cssW / BIN_COUNT;
-  // На внутренний бар оставляем cssH - 2px: 1px нижняя линия + 1px воздух сверху.
   const innerH = cssH - 2;
 
   for (let i = 0; i < BIN_COUNT; i++) {
     const bin = bins[i];
     if (bin.total === 0) continue;
-    // Целочисленные границы бара — без них при дробном barSlot между
-    // соседними барами проступали бы полупрозрачные полоски.
+    // Целочисленные границы предотвращают полупрозрачные артефакты между барами
     const xStart = Math.floor(i * barSlot);
     const xEnd   = Math.floor((i + 1) * barSlot);
-    const w      = Math.max(1, xEnd - xStart - 1); // 1px зазор справа
+    const w      = Math.max(1, xEnd - xStart - 1);
 
-    let yBase = cssH - 1; // рисуем снизу-вверх от нижней линии
+    let yBase = cssH - 1;
     for (const lvl of LEVELS_BOTTOM_UP) {
       const c = bin.counts[lvl];
       if (!c) continue;
-      // Высота сегмента пропорциональна доле в общем total; но даже 1
-      // запись должна быть видна — поэтому минимум 1px.
+      // Минимум 1px даже для одной записи, чтобы она была видна
       const h = Math.max(1, Math.round((c / max) * innerH));
       cx.fillStyle = palette[lvl];
       cx.fillRect(xStart, yBase - h, w, h);
@@ -220,9 +209,15 @@ function paint(bins, max, cssW, cssH) {
 
 // ===================== Подпись оси X =====================
 
+/**
+ * Форматирует временную метку для подписи оси X.
+ * Для окон ≥12 часов показывает дату и время, иначе только время.
+ * 
+ * @param {number} ms - Временная метка в миллисекундах
+ * @returns {string} Отформатированная строка времени
+ */
 function formatAxisTime(ms) {
   const d = new Date(ms);
-  // Для длинных окон (≥12 часов) дата важнее минут — даём день и часы.
   if (lastWindowMs >= 12 * 3600 * 1000) {
     return d.toLocaleString('ru-RU', {
       day: '2-digit', month: '2-digit',
@@ -232,6 +227,12 @@ function formatAxisTime(ms) {
   return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * Обновляет подписи оси X: начало, середина и конец окна.
+ * 
+ * @param {number} startMs - Начало временного окна
+ * @param {number} endMs - Конец временного окна
+ */
 function updateAxis(startMs, endMs) {
   if (!dom.sparklineAxis) return;
   const midMs = startMs + (endMs - startMs) / 2;
@@ -243,6 +244,12 @@ function updateAxis(startMs, endMs) {
 
 // ===================== Сводка справа в шапке =====================
 
+/**
+ * Обновляет сводку по уровням в шапке спарклайна.
+ * Показывает количество записей каждого уровня и общее количество.
+ * 
+ * @param {Array} bins - Массив бинов с данными
+ */
 function updateStats(bins) {
   if (!dom.sparklineStats) return;
   let e = 0, w = 0, i = 0, d = 0;
@@ -253,8 +260,6 @@ function updateStats(bins) {
     d += b.counts.DEBUG;
   }
   const total = e + w + i + d;
-  // Эмодзи-точки + цифра. Цвет точки через inline style — никакой
-  // дополнительной таблицы стилей не нужно.
   dom.sparklineStats.innerHTML =
     `<span class="sparkline-stat" title="ERROR в окне"><span class="sparkline-stat-dot" style="background:var(--error)"></span>${e}</span>` +
     `<span class="sparkline-stat" title="WARN в окне"><span class="sparkline-stat-dot" style="background:var(--warn)"></span>${w}</span>` +
@@ -266,8 +271,8 @@ function updateStats(bins) {
 // ===================== Главный публичный API =====================
 
 /**
- * Запрашивает перерисовку спарклайна. Безопасно вызывать многократно
- * подряд — реальная отрисовка случится максимум один раз за кадр.
+ * Запрашивает перерисовку спарклайна через requestAnimationFrame.
+ * Безопасно вызывать многократно — реальная отрисовка максимум один раз за кадр.
  */
 export function renderSparkline() {
   if (!dom.sparklineWrap) return;
@@ -278,13 +283,13 @@ export function renderSparkline() {
   });
 }
 
+/**
+ * Выполняет немедленную отрисовку спарклайна.
+ */
 function paintNow() {
   if (!dom.sparklineWrap) return;
 
-  // Условие полного скрытия — только одно: данных нет. Кнопка «Свернуть»
-  // НЕ должна прятать весь блок, иначе пользователь не сможет добраться
-  // до неё, чтобы развернуть обратно. В свёрнутом состоянии остаётся
-  // узкая шапка с цифрами и кнопкой «Развернуть».
+  // Скрываем полностью только если данных нет
   if (!state.allLogs.length) {
     dom.sparklineWrap.hidden = true;
     return;
@@ -294,10 +299,8 @@ function paintNow() {
   const collapsed = localStorage.getItem(LS_KEY_COLLAPSED) === '1';
   dom.sparklineWrap.classList.toggle('collapsed', collapsed);
 
-  // Правый край окна:
-  //   • в live-режиме — текущее время (окно «едет» вправо);
-  //   • иначе — время самой свежей записи, чтобы при загруженном дампе
-  //     не было пустоты «после конца файла».
+  // В live-режиме окно «едет» вправо по текущему времени,
+  // иначе привязано к времени самой свежей записи
   const windowMs = lastWindowMs;
   let endMs;
   if (state.liveStreams.size > 0) {
@@ -309,22 +312,18 @@ function paintNow() {
   }
   const startMs = endMs - windowMs;
 
-  // Считаем бины ВСЕГДА — даже в свёрнутом состоянии, потому что в
-  // шапке отображаются итоговые цифры по уровням. Сама раскладка
-  // бинов нужна для updateStats; биннинг дёшев.
+  // Биннинг нужен даже в свёрнутом состоянии для отображения итоговых цифр
   const { bins, max } = binByLevel(state.allLogs, windowMs, endMs);
   lastBins = bins;
   updateStats(bins);
 
   if (collapsed) {
-    // Канвас и ось не нужны — CSS их прячет по классу .collapsed.
-    // Тултип, если он остался от прошлой сессии, тоже убираем.
     hideTooltip();
     return;
   }
 
   const sized = resizeCanvas();
-  if (!sized) return; // канвас ещё не растянут — попробуем в следующем render()
+  if (!sized) return;
   ctx = sized.ctx;
   palette = readPalette();
 
@@ -335,8 +334,10 @@ function paintNow() {
 // ===================== Тултип =====================
 
 /**
- * Определяет бин под курсором по clientX. Возвращает { idx, bin }
- * или null, если курсор вне канваса.
+ * Определяет бин под курсором по горизонтальной координате.
+ * 
+ * @param {number} clientX - Координата X курсора
+ * @returns {{idx: number, bin: Object}|null} Индекс и данные бина, или null
  */
 function binAtClientX(clientX) {
   if (!lastBins) return null;
@@ -349,12 +350,18 @@ function binAtClientX(clientX) {
   return { idx, bin: lastBins[idx] };
 }
 
+/**
+ * Показывает тултип с детальной информацией о бине.
+ * 
+ * @param {number} clientX - Координата X для позиционирования
+ * @param {number} clientY - Координата Y для позиционирования
+ * @param {Object} bin - Данные бина
+ */
 function showTooltip(clientX, clientY, bin) {
   const tt = dom.sparklineTooltip;
   if (!tt) return;
   const t0 = new Date(bin.t0);
   const t1 = new Date(bin.t1);
-  // Длительность бина — для контекста («ах, это 30-секундный интервал»).
   const durSec = Math.round((bin.t1 - bin.t0) / 1000);
   const durLabel = durSec >= 60
     ? `${Math.round(durSec / 60)} мин`
@@ -372,9 +379,7 @@ function showTooltip(clientX, clientY, bin) {
     `<div class="sparkline-tt-total">Всего: <b>${bin.total}</b></div>` +
     (bin.total ? `<div class="sparkline-tt-hint">Клик — показать в списке</div>` : '');
 
-  // Тултип позиционируется относительно .sparkline-wrap (position: relative).
-  // Сначала делаем display: block, чтобы получить реальные размеры,
-  // затем корректируем left/top, чтобы не вылезти за края контейнера.
+  // Позиционируем относительно .sparkline-wrap с проверкой границ
   tt.style.display = 'block';
   const wrapRect = dom.sparklineWrap.getBoundingClientRect();
   const ttRect = tt.getBoundingClientRect();
@@ -394,22 +399,23 @@ function hideTooltip() {
 
 // ===================== Зум: клик по бину → timeFrom/timeTo =====================
 
+/**
+ * Устанавливает временной фильтр на границы выбранного бина.
+ * Добавляет небольшой запас с каждой стороны для захвата граничных событий.
+ * 
+ * @param {Object} bin - Данные бина для зума
+ */
 function zoomToBin(bin) {
   if (!bin || bin.total === 0) return;
-  // Маленький запас (полбина) с каждой стороны, чтобы в фильтр попали
-  // соседние записи — это удобно, если событие случилось ровно на
-  // границе бина.
   const pad = (bin.t1 - bin.t0) * 0.5;
   const fromMs = Math.floor(bin.t0 - pad);
   const toMs   = Math.ceil(bin.t1 + pad);
   dom.timeFrom.value = msToDatetimeLocalValue(fromMs);
   dom.timeTo.value   = msToDatetimeLocalValue(toMs);
-  // Программная установка .value НЕ триггерит input/change — диспатчим
-  // вручную, чтобы render() и подсветка пресетов сработали.
+  // Программная установка .value не триггерит события — диспатчим вручную
   dom.timeFrom.dispatchEvent(new Event('input', { bubbles: true }));
   dom.timeTo.dispatchEvent(new Event('input', { bubbles: true }));
-  // Снимаем подсветку у быстрых пресетов — у выбранного диапазона
-  // нет соответствия среди «5 мин / 1 ч / ...».
+  // Снимаем подсветку у быстрых пресетов
   if (dom.quickRangeButtons) {
     dom.quickRangeButtons.forEach(b => b.classList.remove('active'));
   }
@@ -418,22 +424,18 @@ function zoomToBin(bin) {
 // ===================== Инициализация =====================
 
 /**
- * Навешивает все обработчики событий. Должна вызываться один раз
- * из app.js после загрузки DOM (модули с type="module" грузятся с
- * defer-семантикой, так что DOM уже распарсен).
+ * Инициализирует обработчики событий для спарклайна.
+ * Должна вызываться один раз из app.js после загрузки DOM.
  */
 export function attachSparklineHandlers() {
-  // 1. Восстановить выбор окна из localStorage.
+  // Восстановление выбора окна из localStorage
   try {
     const saved = parseInt(localStorage.getItem(LS_KEY_WINDOW) || '', 10);
     if (Number.isFinite(saved) && saved > 0) lastWindowMs = saved;
-  } catch (e) { /* localStorage может быть недоступен (Safari Private) */ }
+  } catch (e) {}
 
-  // 2. Селектор окна.
+  // Селектор временного окна
   if (dom.sparklineWindow) {
-    // Аккуратно выставляем текущее значение, только если оно есть в опциях —
-    // иначе селектор откатится к первой опции при первом render() и собьёт
-    // нашу `lastWindowMs`.
     const opt = Array.from(dom.sparklineWindow.options)
       .find(o => parseInt(o.value, 10) === lastWindowMs);
     if (opt) dom.sparklineWindow.value = opt.value;
@@ -447,10 +449,7 @@ export function attachSparklineHandlers() {
     });
   }
 
-  // 3. Кнопка «Свернуть / Развернуть».
-  //    Намеренно НЕ прячем всю секцию: пользователь должен иметь
-  //    возможность развернуть её обратно, поэтому шапка с кнопкой
-  //    остаётся видимой и в свёрнутом состоянии.
+  // Кнопка «Свернуть / Развернуть»
   if (dom.sparklineToggle) {
     const setButtonState = (collapsed) => {
       dom.sparklineToggle.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
@@ -470,7 +469,7 @@ export function attachSparklineHandlers() {
     });
   }
 
-  // 4. Канвас: тултип и клик.
+  // Канвас: тултип и клик
   if (dom.sparklineCanvas) {
     dom.sparklineCanvas.addEventListener('mousemove', (e) => {
       const hit = binAtClientX(e.clientX);
@@ -486,22 +485,17 @@ export function attachSparklineHandlers() {
     });
   }
 
-  // 5. Ресайз окна — канвас зависит от ширины контейнера.
-  // Не дёргаем renderSparkline() напрямую: rAF-дроссель внутри.
+  // Ресайз окна
   window.addEventListener('resize', () => renderSparkline());
 
-  // 6. Тик в live-режиме: даже если новых записей не приходило,
-  // окно «сейчас» должно сдвигаться, иначе справа будет расти
-  // пустой хвост.
+  // Автотик в live-режиме для сдвига окна
   setInterval(() => {
     if (state.liveStreams.size > 0 && !state.liveStreamPaused) {
       renderSparkline();
     }
   }, LIVE_TICK_MS);
 
-  // 7. Смена темы: цвета палитры нужно перечитать из CSS-переменных.
-  // MutationObserver на data-theme дешевле, чем подписка на событие
-  // через CustomEvent — никакой синхронизации с app.js не требуется.
+  // Смена темы: перечитать палитру из CSS-переменных
   const themeObserver = new MutationObserver((mutations) => {
     for (const m of mutations) {
       if (m.attributeName === 'data-theme') {

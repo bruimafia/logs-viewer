@@ -27,7 +27,7 @@ export const state = {
   // key "serverId::fileId" → { displayName, serverId, fileId, group }
   liveStreams: new Map(),
 
-  // Глобальный флаг паузы live-потоков (пункт 3.1). При true входящие
+  // Глобальный флаг паузы live-потоков. При true входящие
   // строки не пушатся в allLogs, а копятся в livePausedBuffer.
   // SSE-соединение и серверные `tail -F` процессы остаются живыми.
   liveStreamPaused: false,
@@ -91,7 +91,7 @@ export const dom = {
   themeToggleBtn: document.getElementById('themeToggle'),
   tzSelector:     document.getElementById('tzSelector'),
 
-  // Галочки 🔔 / 🔊 для пунктов 3.2 и 3.3 (см. public/error-alerts.js).
+  // Галочки 🔔 / 🔊 для уведомлений и звука на ERROR (см. public/error-alerts.js).
   notifyOnErrorToggle: document.getElementById('notifyOnErrorToggle'),
   soundOnErrorToggle:  document.getElementById('soundOnErrorToggle'),
 
@@ -100,7 +100,7 @@ export const dom = {
   traceFilterValue: document.getElementById('traceFilterValue'),
   traceFilterClear: document.getElementById('traceFilterClear'),
 
-  // Мини-спарклайн со статистикой (пункт 3.4). См. public/sparkline.js.
+  // Мини-спарклайн со статистикой. См. public/sparkline.js.
   sparklineWrap:    document.getElementById('sparklineWrap'),
   sparklineCanvas:  document.getElementById('sparklineCanvas'),
   sparklineAxis:    document.getElementById('sparklineAxis'),
@@ -109,6 +109,6 @@ export const dom = {
   sparklineToggle:  document.getElementById('sparklineToggle'),
   sparklineTooltip: document.getElementById('sparklineTooltip'),
 
-  // Контейнер toast-уведомлений (пункт 6.1)
+  // Контейнер toast-уведомлений
   toastContainer: document.getElementById('toastContainer')
 };

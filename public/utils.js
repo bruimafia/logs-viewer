@@ -254,8 +254,7 @@ export function shortTraceId(traceId) {
 }
 
 /**
- * Возвращает стабильный CSS-цвет (HSL) по имени сервиса
- * (пункт 6.5 плана улучшений).
+ * Возвращает стабильный CSS-цвет (HSL) по имени сервиса.
  *
  * От `traceIdColor` отличается параметрами насыщенности/яркости: цвет
  * сервиса чуть менее яркий и чуть более насыщенный — так визуальный язык
@@ -523,7 +522,7 @@ export function formatTimeFull(ms, nowMs, tzOffsetMinutes) {
  
   // День недели + полная дата + время с миллисекундами и смещением TZ.
   // Поведение зависит от tzOffsetMinutes:
-  //   null  → локальный пояс браузера (исходное поведение — пункт 6.3);
+  //   null  → локальный пояс браузера (исходное поведение);
   //   число → фиксированное смещение: сдвигаем ms, читаем UTC-методами.
   const pad = (n, w = 2) => String(n).padStart(w, '0');
  
@@ -547,9 +546,7 @@ export function formatTimeFull(ms, nowMs, tzOffsetMinutes) {
     const tzAbs  = Math.abs(tzMin);
     tzStr = `UTC${tzSign}${pad(Math.floor(tzAbs / 60))}:${pad(tzAbs % 60)}`;
   } else {
-    // ——— Фиксированное смещение (пункт 6.4) ———
-    // Сдвигаем ms на offset и считываем компоненты через UTC-методы.
-    // Так мы не зависим от браузерного TZ вообще.
+    // Фиксированное смещение: сдвигаем ms на offset и считываем через UTC-методы
     const shifted = new Date(ms + tzOffsetMinutes * 60_000);
     dateStr = shifted.toLocaleString('ru-RU', {
       timeZone: 'UTC',
