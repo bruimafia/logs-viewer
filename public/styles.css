@@ -1,483 +1,1044 @@
+/* =============================================================================
+   Logs Viewer — Design System v2
+   -----------------------------------------------------------------------------
+   Архитектура CSS:
+     1. Дизайн-токены (color/typography/spacing/radius/shadow/motion).
+     2. Семантические алиасы для обратной совместимости (--info/--error/...).
+     3. Сброс и базовые стили.
+     4. Доступность: focus-visible, prefers-reduced-motion, скрытые элементы.
+     5. Layout (header + toolbar + log-list).
+     6. Компоненты (кнопки, бейджи, инпуты, чипы, модалки, тосты, ...).
+     7. Доменные блоки (live, sparkline, trace, JSON-syntax, ...).
+     8. Компактный режим, темы, адаптив.
+
+   Палитра взята из design_system/ (Azure / Primary / Neutral / Basic):
+     Primary blue   #286AFF
+     Success green  #58B251
+     Warning amber  #FAAD14
+     Danger  red    #E02828
+     Info    teal   #1CA4B4
+     Neutral light  #F1F2F4 → #FEFEFE
+     Neutral dark   #11192C → #3D4454
+   ========================================================================== */
+
+
+/* ============================================================
+   1. Дизайн-токены: тёмная тема (по умолчанию)
+   ============================================================ */
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0f1117;
-  --surface: #161b24;
-  --border: #2d3548;
-  --text: #e6edf3;
-  --text-muted: #8b949e;
-  --error: #f85149;
-  --warn: #d29922;
-  --info: #58a6ff;
-  --debug: #8b949e;
-  --success: #3fb950;
-  --radius: 8px;
-  --font-mono: 'JetBrains Mono', monospace;
-  --font-ui: 'Inter', system-ui, sans-serif;
 
-/* Тематические тинты и состояния для обеих тем */
-  --btn-hover: #3d4556;
-  --btn-primary-hover: #4a9eff;
-  --btn-success-hover: #4ac962;
-  --btn-danger-hover: #ff6259;
-  --row-bg: rgba(255,255,255,0.02);
-  --row-subtle: rgba(255,255,255,0.05);
-  --row-hover: rgba(255,255,255,0.08);
-  --error-tint: rgba(248,81,73,0.08);
-  --error-tint-strong: rgba(248,81,73,0.15);
-  --warn-tint: rgba(210,153,34,0.08);
-  --info-tint: rgba(88,166,255,0.05);
-  --info-tint-strong: rgba(88,166,255,0.15);
-  --debug-tint: rgba(139,148,158,0.12);
-  --success-status-tint: rgba(63,185,80,0.2);
-  --error-status-tint: rgba(248,81,73,0.2);
-  --info-status-tint: rgba(88,166,255,0.2);
-  --live-flash: rgba(63,185,80,0.25);
-  --modal-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  --modal-shadow-strong: 0 20px 60px rgba(0,0,0,0.5);
-  --modal-overlay: rgba(0,0,0,0.7);
-  --match-bg: #f1e05a;        /* насыщенный жёлтый, читается на тёмном фоне */
-  --match-fg: #0f1117;        /* почти чёрный текст внутри подсветки */
+  /* --- Базовые слои поверхности (canvas → surface-1 → surface-2 → surface-3) --- */
+  --color-bg-canvas:      #0D121E;
+  --color-surface-1:      #131A28;
+  --color-surface-2:      #1A2233;
+  --color-surface-3:      #232C40;
+  --color-surface-raised: #1F2738;
+
+  /* --- Границы и сепараторы --- */
+  --color-border-subtle:  #1F2738;
+  --color-border-default: #2A3447;
+  --color-border-strong:  #3A4763;
+  --color-divider:        #1E2636;
+
+  /* --- Текст --- */
+  --color-fg-default:     #E6EAF2;
+  --color-fg-muted:       #9AA4B8;
+  --color-fg-subtle:      #6E7891;
+  --color-fg-on-accent:   #FFFFFF;
+
+  /* --- Бренд / акценты --- */
+  --color-accent:           #4A86FF;
+  --color-accent-hover:     #5C95FF;
+  --color-accent-active:    #3A75ED;
+  --color-accent-soft:      rgba(74,134,255,0.14);
+  --color-accent-soft-hover:rgba(74,134,255,0.22);
+
+  /* --- Семантические --- */
+  --color-success:         #4FB554;
+  --color-success-soft:    rgba(79,181,84,0.16);
+  --color-warning:         #F5A623;
+  --color-warning-soft:    rgba(245,166,35,0.16);
+  --color-danger:          #EB4D4D;
+  --color-danger-soft:     rgba(235,77,77,0.14);
+  --color-danger-soft-strong: rgba(235,77,77,0.22);
+  --color-info:            #2BB6C9;
+  --color-info-soft:       rgba(43,182,201,0.14);
+  --color-debug:           #7E89A4;
+  --color-debug-soft:      rgba(126,137,164,0.18);
+
+  /* --- Состояния строк --- */
+  --color-row-bg:         transparent;
+  --color-row-zebra:      rgba(255,255,255,0.018);
+  --color-row-hover:      rgba(255,255,255,0.05);
+  --color-row-selected:   rgba(74,134,255,0.12);
+
+  /* --- Фокус --- */
+  --color-focus-ring:     #5C95FF;
+  --shadow-focus-ring:    0 0 0 3px rgba(92,149,255,0.30);
+
+  /* --- Подсветка совпадений поиска --- */
+  --color-match-bg:       #F2DA47;
+  --color-match-fg:       #0D121E;
+
+  /* --- Оверлеи и тени --- */
+  --color-modal-overlay:  rgba(5,8,15,0.65);
+  --shadow-1:             0 1px 2px rgba(0,0,0,0.30);
+  --shadow-2:             0 4px 12px rgba(0,0,0,0.35);
+  --shadow-3:             0 16px 40px rgba(0,0,0,0.50);
+  --shadow-elev-hover:    0 2px 8px rgba(0,0,0,0.35);
+
+  /* --- Скроллбары --- */
+  --color-scrollbar-thumb: #2A3447;
+  --color-scrollbar-thumb-hover: #3A4763;
+
+  /* ===== Обратная совместимость со старыми именами (используются inline в JS/SVG) ===== */
+  --bg:               var(--color-bg-canvas);
+  --surface:          var(--color-surface-1);
+  --border:           var(--color-border-default);
+  --text:             var(--color-fg-default);
+  --text-muted:       var(--color-fg-muted);
+  --error:            var(--color-danger);
+  --warn:             var(--color-warning);
+  --info:             var(--color-accent);     /* «info» в коде значит primary-action */
+  --debug:            var(--color-debug);
+  --success:          var(--color-success);
+  --radius:           var(--radius-md);
+  --font-mono:        'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-ui:          'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --btn-hover:        var(--color-surface-3);
+  --btn-primary-hover:var(--color-accent-hover);
+  --btn-success-hover:#5BC461;
+  --btn-danger-hover: #F25F5F;
+  --row-bg:           var(--color-row-bg);
+  --row-subtle:       var(--color-row-zebra);
+  --row-hover:        var(--color-row-hover);
+  --error-tint:       var(--color-danger-soft);
+  --error-tint-strong:var(--color-danger-soft-strong);
+  --warn-tint:        var(--color-warning-soft);
+  --info-tint:        var(--color-accent-soft);
+  --info-tint-strong: var(--color-accent-soft-hover);
+  --debug-tint:       var(--color-debug-soft);
+  --success-status-tint: var(--color-success-soft);
+  --error-status-tint:   var(--color-danger-soft);
+  --info-status-tint:    var(--color-accent-soft);
+  --live-flash:       rgba(79,181,84,0.22);
+  --modal-shadow:     var(--shadow-2);
+  --modal-shadow-strong: var(--shadow-3);
+  --modal-overlay:    var(--color-modal-overlay);
+  --match-bg:         var(--color-match-bg);
+  --match-fg:         var(--color-match-fg);
 }
 
+
+/* ============================================================
+   2. Дизайн-токены: светлая тема
+   ============================================================ */
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f6f8fa;
-  --surface: #ffffff;
-  --border: #d0d7de;
-  --text: #1f2328;
-  --text-muted: #656d76;
-  --error: #cf222e;
-  --warn: #9a6700;
-  --info: #0969da;
-  --debug: #656d76;
-  --success: #1a7f37;
 
-  --btn-hover: #c8d1da;
-  --btn-primary-hover: #0860c5;
-  --btn-success-hover: #186b2f;
-  --btn-danger-hover: #b61d29;
-  --row-bg: rgba(0,0,0,0.02);
-  --row-subtle: rgba(0,0,0,0.04);
-  --row-hover: rgba(0,0,0,0.06);
-  --error-tint: rgba(207,34,46,0.06);
-  --error-tint-strong: rgba(207,34,46,0.12);
-  --warn-tint: rgba(154,103,0,0.08);
-  --info-tint: rgba(9,105,218,0.05);
-  --info-tint-strong: rgba(9,105,218,0.12);
-  --debug-tint: rgba(101,109,118,0.08);
-  --success-status-tint: rgba(26,127,55,0.15);
-  --error-status-tint: rgba(207,34,46,0.12);
-  --info-status-tint: rgba(9,105,218,0.12);
-  --live-flash: rgba(26,127,55,0.18);
-  --modal-shadow: 0 8px 24px rgba(31,35,40,0.15);
-  --modal-shadow-strong: 0 20px 60px rgba(31,35,40,0.2);
-  --modal-overlay: rgba(31,35,40,0.4);
-  --match-bg: #fff8c5;        /* мягкий жёлтый в духе GitHub */
-  --match-fg: #1f2328;        /* тёмный текст */
+  --color-bg-canvas:      #F1F2F4;
+  --color-surface-1:      #FFFFFF;
+  --color-surface-2:      #F7F8FA;
+  --color-surface-3:      #EEF0F4;
+  --color-surface-raised: #FFFFFF;
+
+  --color-border-subtle:  #ECEEF2;
+  --color-border-default: #D9DDE5;
+  --color-border-strong:  #B8BFCB;
+  --color-divider:        #E3E6EC;
+
+  --color-fg-default:     #1A2233;
+  --color-fg-muted:       #5B657D;
+  --color-fg-subtle:      #828BA5;
+  --color-fg-on-accent:   #FFFFFF;
+
+  --color-accent:           #2456D9;
+  --color-accent-hover:     #1A47BD;
+  --color-accent-active:    #1740AB;
+  --color-accent-soft:      rgba(36,86,217,0.10);
+  --color-accent-soft-hover:rgba(36,86,217,0.18);
+
+  --color-success:         #2E8B36;
+  --color-success-soft:    rgba(46,139,54,0.12);
+  --color-warning:         #B36A00;
+  --color-warning-soft:    rgba(179,106,0,0.12);
+  --color-danger:          #C5302E;
+  --color-danger-soft:     rgba(197,48,46,0.10);
+  --color-danger-soft-strong: rgba(197,48,46,0.18);
+  --color-info:            #18737E;
+  --color-info-soft:       rgba(24,115,126,0.10);
+  --color-debug:           #5B657D;
+  --color-debug-soft:      rgba(91,101,125,0.10);
+
+  --color-row-bg:         transparent;
+  --color-row-zebra:      rgba(15,23,42,0.025);
+  --color-row-hover:      rgba(15,23,42,0.05);
+  --color-row-selected:   rgba(36,86,217,0.10);
+
+  --color-focus-ring:     #2456D9;
+  --shadow-focus-ring:    0 0 0 3px rgba(36,86,217,0.22);
+
+  --color-match-bg:       #FFE89A;
+  --color-match-fg:       #1A2233;
+
+  --color-modal-overlay:  rgba(15,23,42,0.40);
+  --shadow-1:             0 1px 2px rgba(15,23,42,0.06);
+  --shadow-2:             0 6px 20px rgba(15,23,42,0.12);
+  --shadow-3:             0 18px 48px rgba(15,23,42,0.18);
+  --shadow-elev-hover:    0 4px 14px rgba(15,23,42,0.10);
+
+  --color-scrollbar-thumb: #C8CAD0;
+  --color-scrollbar-thumb-hover: #A6ACB8;
+
+  /* Обратная совместимость */
+  --bg:               var(--color-bg-canvas);
+  --surface:          var(--color-surface-1);
+  --border:           var(--color-border-default);
+  --text:             var(--color-fg-default);
+  --text-muted:       var(--color-fg-muted);
+  --error:            var(--color-danger);
+  --warn:             var(--color-warning);
+  --info:             var(--color-accent);
+  --debug:            var(--color-debug);
+  --success:          var(--color-success);
+  --btn-hover:        var(--color-surface-3);
+  --btn-primary-hover:var(--color-accent-hover);
+  --btn-success-hover:#247529;
+  --btn-danger-hover: #A12422;
+  --row-bg:           var(--color-row-bg);
+  --row-subtle:       var(--color-row-zebra);
+  --row-hover:        var(--color-row-hover);
+  --error-tint:       var(--color-danger-soft);
+  --error-tint-strong:var(--color-danger-soft-strong);
+  --warn-tint:        var(--color-warning-soft);
+  --info-tint:        var(--color-accent-soft);
+  --info-tint-strong: var(--color-accent-soft-hover);
+  --debug-tint:       var(--color-debug-soft);
+  --success-status-tint: var(--color-success-soft);
+  --error-status-tint:   var(--color-danger-soft);
+  --info-status-tint:    var(--color-accent-soft);
+  --live-flash:       rgba(46,139,54,0.18);
+  --modal-shadow:     var(--shadow-2);
+  --modal-shadow-strong: var(--shadow-3);
+  --modal-overlay:    var(--color-modal-overlay);
+  --match-bg:         var(--color-match-bg);
+  --match-fg:         var(--color-match-fg);
 }
 
-* { box-sizing: border-box; }
+
+/* ============================================================
+   3. Геометрические/типографические токены (общие для обеих тем)
+   ============================================================ */
+:root {
+  /* Spacing — 4 px-сетка */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Радиусы */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-full: 999px;
+
+  /* Типографика */
+  --font-size-xs:  11px;
+  --font-size-sm:  12px;
+  --font-size-md:  13px;
+  --font-size-lg:  14px;
+  --font-size-xl:  16px;
+  --font-size-2xl: 18px;
+  --line-tight: 1.25;
+  --line-snug:  1.4;
+  --line-base:  1.5;
+
+  /* Motion */
+  --ease-out:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-instant: 80ms;
+  --duration-fast:    120ms;
+  --duration-base:    180ms;
+  --duration-slow:    260ms;
+
+  /* Container */
+  --content-max-width: 1680px;
+
+  /* Высоты контролов */
+  --control-h-sm: 26px;
+  --control-h-md: 30px;
+  --control-h-lg: 34px;
+}
+
+
+/* ============================================================
+   4. Сброс и базовые стили
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
 body {
   margin: 0;
   font-family: var(--font-ui);
-  background: var(--bg);
-  color: var(--text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-base);
+  background: var(--color-bg-canvas);
+  color: var(--color-fg-default);
   min-height: 100vh;
-  font-size: 14px;
+  /* Включаем cv11 = stylistic alt для l/I, tnum = табличные цифры —
+     обновление времени в live-режиме не «дёргает» соседние колонки. */
+  font-feature-settings: 'cv11' 1, 'ss01' 1, 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Глобальная стилизация скроллбаров — мягкие и тонкие, под цвет поверхности. */
+* { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar-thumb) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-thumb-hover); background-clip: padding-box; }
+
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button { font-family: inherit; }
+
+
+/* ============================================================
+   5. Доступность
+   ============================================================ */
+
+/* Единый focus-ring для всех интерактивных элементов. Используем focus-visible
+   чтобы клики мышью не показывали ring, а Tab-навигация — показывала. */
+:where(button, [role="button"], a, input, select, textarea, summary,
+       .level-check, .quick-range-clear, .service-chip, .file-item,
+       .modal-tab, .log-trace-badge, .error-alert-toggle, .compact-mode-check,
+       .append-mode-check):focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Тонкое внутреннее «свечение» при фокусе на полях ввода */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-accent) !important;
+  box-shadow: var(--shadow-focus-ring);
+}
+
+/* Утилита для визуально скрытых, но доступных скринридерам элементов */
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip-link: появляется по Tab над всем интерфейсом и ведёт к списку логов */
+.skip-link {
+  position: absolute;
+  top: -100px; left: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-accent);
+  color: var(--color-fg-on-accent);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  z-index: 9999;
+  transition: top var(--duration-fast) var(--ease-out);
+}
+.skip-link:focus { top: var(--space-2); text-decoration: none; }
+
+/* Уважение к prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .live-dot { animation: none !important; }
+}
+
+
+/* ============================================================
+   6. Layout
+   ============================================================ */
 .layout {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  min-width: 320px;
 }
 
+
+/* ============================================================
+   7. Header
+   ------------------------------------------------------------
+   Семантические зоны: brand → actions → meta. Внутри каждой
+   зоны связанные контролы сгруппированы в .header-group и
+   разделены тонкими сепараторами.
+   ============================================================ */
 header {
-  padding: 12px 20px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 16px;
   flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  min-height: 48px;
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-divider);
+  position: relative;
+  z-index: 20;
 }
 
-.title { font-weight: 600; font-size: 1.1rem; }
-.file-input-wrap { position: relative; }
-.file-input-wrap input[type="file"] {
-  position: absolute; left: 0; top: 0;
-  width: 100%; height: 100%;
-  opacity: 0; cursor: pointer;
+/* Заголовок */
+.title {
+  font-weight: 600;
+  font-size: var(--font-size-lg);
+  letter-spacing: -0.01em;
+  color: var(--color-fg-default);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+  padding-right: var(--space-2);
 }
+.title::before {
+  /* Фирменная иконка приложения из /public/favicon.svg.
+     Используем background-image (а не mask), чтобы сохранить
+     родной градиент и многослойность SVG. */
+  content: '';
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  background: url('/public/favicon.svg') no-repeat center / contain;
+}
+
+/* Группы элементов внутри хедера */
+.header-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Вертикальный сепаратор между группами хедера */
+.header-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--color-divider);
+  flex-shrink: 0;
+}
+
+/* «Толкатель» — растягивается, прижимая правую зону к краю */
+.header-spacer { flex: 1; min-width: var(--space-3); }
+
+
+/* ============================================================
+   8. Кнопки (унифицированная система)
+   ------------------------------------------------------------
+   Иерархия: primary > secondary > tertiary > ghost > danger-ghost
+   ============================================================ */
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: var(--border);
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  color: var(--text);
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-h-md);
+  padding: 0 var(--space-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-default);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  line-height: 1;
   cursor: pointer;
-  transition: background 0.15s;
+  white-space: nowrap;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-instant) var(--ease-out);
 }
-.btn:hover { background: var(--btn-hover); }
-.btn-primary { background: var(--info); color: #fff; }
-.btn-primary:hover { background: var(--btn-primary-hover); }
-.btn-success { background: var(--success); color: #fff; }
-.btn-success:hover { background: var(--btn-success-hover); }
-.btn-danger { background: var(--error); color: #fff; }
-.btn-danger:hover { background: var(--btn-danger-hover); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:hover { background: var(--color-surface-3); border-color: var(--color-border-strong); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 
-/* Компактная кнопка «открытые файлы» в шапке.
-   Иконка + счётчик; полный список имён — в нативном title-tooltip. */
+/* Primary — основная CTA. Сплошная заливка акцентным цветом. */
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-fg-on-accent);
+  box-shadow: var(--shadow-1);
+}
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  box-shadow: var(--shadow-elev-hover);
+}
+.btn-primary:active { background: var(--color-accent-active); border-color: var(--color-accent-active); }
+
+/* Success — позитивные действия (например, «Удалённые файлы») */
+.btn-success {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--color-fg-on-accent);
+}
+.btn-success:hover { background: var(--btn-success-hover); border-color: var(--btn-success-hover); }
+
+/* Danger — деструктивные действия */
+.btn-danger {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-danger);
+}
+.btn-danger:hover {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+}
+
+/* Размеры */
+.btn-xs {
+  height: 22px;
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm);
+}
+
+/* Файловая кнопка (скрытый input + кликабельный button) */
+.file-input-wrap { position: relative; display: inline-flex; }
+.file-input-wrap input[type="file"] {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0; cursor: pointer;
+}
+
+/* ===================== Бейдж открытых файлов ===================== */
 .open-files-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 10px;
-  background: var(--border);
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  color: var(--text-muted);
+  gap: var(--space-2);
+  height: var(--control-h-md);
+  padding: 0 var(--space-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-muted);
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   cursor: default;
   flex-shrink: 0;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
 }
-/* При наличии файлов слегка подсвечиваем кнопку */
 .open-files-btn.has-files {
-  color: var(--text);
-  border-color: var(--border);
+  color: var(--color-fg-default);
+  border-color: var(--color-border-default);
   cursor: help;
 }
 .open-files-btn.has-files:hover {
-  background: var(--btn-hover);
-  border-color: var(--text-muted);
+  background: var(--color-surface-3);
+  border-color: var(--color-border-strong);
 }
 .open-files-icon {
-  width: 15px;
-  height: 15px;
+  width: 14px; height: 14px;
   flex-shrink: 0;
+  color: var(--color-fg-muted);
 }
+.has-files .open-files-icon { color: var(--color-accent); }
 .open-files-count {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
   min-width: 1ch;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
-/* Live-индикатор в шапке */
+
+/* ============================================================
+   9. Live-индикатор
+   ============================================================ */
+.live-indicator-wrap { position: relative; }
+
 .live-indicator {
   display: none;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px 6px 8px;
-  background: var(--error-tint-strong);
-  border: 1px solid var(--error);
-  border-radius: var(--radius);
-  font-size: 12px;
+  gap: var(--space-2);
+  height: var(--control-h-md);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  background: var(--color-danger-soft);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 55%, transparent);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-default);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
 }
 .live-indicator.active { display: inline-flex; }
+.live-indicator:hover { border-color: var(--color-danger); }
+
 .live-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
-  background: var(--error);
-  animation: live-pulse 1.5s ease-in-out infinite;
+  background: var(--color-danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 25%, transparent);
+  animation: live-pulse 1.6s ease-in-out infinite;
+  flex-shrink: 0;
 }
 @keyframes live-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.85); }
 }
-.live-indicator-text { font-weight: 500; }
-.live-count {
-  background: var(--error);
-  color: #fff;
-  padding: 1px 6px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 500;
-}
-.live-stop-btn {
-  padding: 4px 8px;
-  font-size: 11px;
-  background: var(--error);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-left: 4px;
-}
-.live-stop-btn:hover { background: var(--btn-danger-hover); }
-/* Кнопка «Пауза / Возобновить» в live-индикаторе.
-   Класс .resume выставляется из render.js, когда пауза включена. */
-.live-pause-btn {
-  padding: 4px 8px;
-  font-size: 11px;
-  background: var(--border);
-  color: var(--text);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.live-pause-btn:hover { background: var(--btn-hover); }
-.live-pause-btn.resume {
-  background: var(--success);
-  color: #fff;
-}
-.live-pause-btn.resume:hover { background: var(--btn-success-hover); }
 
-/* Внешний вид индикатора, когда live-поток на паузе.
-   Пульсация точки выключается, цвета приглушаются — визуальный сигнал,
-   что отображение приостановлено (хотя данные продолжают приходить). */
+.live-indicator-text { font-weight: 600; letter-spacing: 0.04em; font-size: var(--font-size-xs); text-transform: uppercase; }
+.live-count {
+  background: var(--color-danger);
+  color: var(--color-fg-on-accent);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 22px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.live-pause-btn,
+.live-stop-btn {
+  height: 22px;
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  background: var(--color-surface-1);
+  color: var(--color-fg-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+.live-pause-btn:hover { background: var(--color-surface-3); border-color: var(--color-border-strong); }
+.live-stop-btn {
+  background: var(--color-danger);
+  color: var(--color-fg-on-accent);
+  border-color: var(--color-danger);
+}
+.live-stop-btn:hover { background: var(--btn-danger-hover); border-color: var(--btn-danger-hover); }
+.live-pause-btn.resume {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--color-fg-on-accent);
+}
+.live-pause-btn.resume:hover { background: var(--btn-success-hover); border-color: var(--btn-success-hover); }
+
+/* Состояние pause — приглушённое, без пульсации */
 .live-indicator.paused {
-  background: var(--surface);
-  border-color: var(--text-muted);
+  background: var(--color-surface-2);
+  border-color: var(--color-border-default);
 }
 .live-indicator.paused .live-dot {
   animation: none;
-  background: var(--text-muted);
+  background: var(--color-fg-subtle);
+  box-shadow: none;
 }
-.live-indicator.paused .live-count {
-  background: var(--text-muted);
-}
+.live-indicator.paused .live-count { background: var(--color-fg-subtle); }
+
+/* Выпадающий список активных стримов */
 .live-streams-list {
   display: none;
   position: absolute;
-  top: 100%;
+  top: calc(100% + var(--space-1));
   right: 0;
-  margin-top: 4px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 8px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
   min-width: 280px;
-  max-width: 400px;
-  box-shadow: var(--modal-shadow);
+  max-width: 420px;
+  box-shadow: var(--shadow-2);
   z-index: 100;
 }
 .live-streams-list.visible { display: block; }
-.live-indicator-wrap { position: relative; }
 .live-stream-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 11px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
 }
-.live-stream-item:hover { background: var(--row-subtle); }
-.live-stream-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.live-stream-stop {
-  padding: 2px 8px;
-  font-size: 10px;
-  background: var(--border);
-  border: none;
-  color: var(--text);
-  border-radius: 3px;
-  cursor: pointer;
-}
-.live-stream-stop:hover { background: var(--error); color: #fff; }
+.live-stream-item:hover { background: var(--color-row-hover); }
+.live-stream-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
 
+
+/* ============================================================
+   10. Toolbar
+   ============================================================ */
 .toolbar {
-  padding: 10px 20px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
   align-items: center;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-divider);
+  position: relative;
+  z-index: 10;
 }
+
+.toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+/* Унифицированный стиль input/select в тулбаре */
+.toolbar input,
+.toolbar select {
+  height: var(--control-h-md);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1);
+  color: var(--color-fg-default);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-feature-settings: 'tnum' 1;
+  transition: border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+}
+.toolbar input:hover,
+.toolbar select:hover { border-color: var(--color-border-strong); }
+.toolbar input, .toolbar select { cursor: pointer; }
+.toolbar input[type="text"] { min-width: 220px; }
+.toolbar input[type="datetime-local"] { font-family: var(--font-mono); }
+
+/* Поиск с встроенной иконкой */
+.toolbar label:has(#search) {
+  position: relative;
+  padding-left: 22px;
+}
+.toolbar label:has(#search)::before {
+  content: '';
+  position: absolute;
+  left: var(--space-1);
+  top: 50%;
+  width: 14px; height: 14px;
+  transform: translateY(-50%);
+  background-color: var(--color-fg-subtle);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat center / contain;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat center / contain;
+  pointer-events: none;
+}
+#search { padding-left: var(--space-2); }
+
+
+/* ===================== Group: фильтр уровней ===================== */
+.level-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  /* Высота приравнена к высоте контрола (--control-h-md) + 2px на рамку
+     самой обёртки — это даёт тот же внешний бокс, что и у .time-filter,
+     где внутрь вкладываются полноразмерные input/select. Без +2px
+     соседние «рамки-обёртки» в тулбаре отличались бы по высоте на 2px
+     при box-sizing: border-box. */
+  min-height: calc(var(--control-h-md) + 2px);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+.level-filter-label {
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0 var(--space-2) 0 var(--space-2);
+}
+.level-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  user-select: none;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+.level-check:hover { color: var(--color-fg-default); background: var(--color-surface-3); }
+.level-check input { accent-color: var(--color-accent); cursor: pointer; margin: 0; }
+/* Подкрашиваем галочку уровня в его собственный семантический цвет */
+.level-check:has([value="ERROR"]) input { accent-color: var(--color-danger); }
+.level-check:has([value="WARN"])  input { accent-color: var(--color-warning); }
+.level-check:has([value="INFO"])  input { accent-color: var(--color-accent); }
+.level-check:has([value="DEBUG"]) input { accent-color: var(--color-debug); }
+.level-check:has(input:checked):has([value="ERROR"]) { color: var(--color-danger); }
+.level-check:has(input:checked):has([value="WARN"])  { color: var(--color-warning); }
+.level-check:has(input:checked):has([value="INFO"])  { color: var(--color-accent); }
+.level-check:has(input:checked):has([value="DEBUG"]) { color: var(--color-debug); }
+
+
+/* ===================== Group: быстрые временные диапазоны ===================== */
+/* Компактный выпадающий список пресетов + кнопка очистки справа.
+   Раньше это был ряд из ~9 кнопок — он занимал всю ширину тулбара и
+   быстро устаревал визуально. Сейчас всё свёрнуто в один <select>
+   (см. index.html), а кнопка «×» сидит вплотную справа. */
+.quick-ranges {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.quick-range-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+.quick-ranges-label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-fg-subtle);
+}
+/* Сам <select> наследует общий стиль .toolbar select (см. выше) —
+   намеренно не переопределяем рамку/фон/стрелку, чтобы выпадающий
+   список выглядел как стандартный (например, «Сортировка»). */
+.quick-range-select {
+  min-width: 160px;
+  cursor: pointer;
+}
+
+.quick-range-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: var(--control-h-md);
+  padding: 0;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-fg-subtle);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+.quick-range-clear:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+
+/* ===================== Group: фильтр временного диапазона =====================
+   Объединяет «С», «До» и пресет «Быстро» в одну рамку-обёртку —
+   зеркалит стилистику .level-filter, чтобы родственные фильтры тулбара
+   читались как единая зона. При этом внутренние date-инпуты и select
+   пресетов СОХРАНЯЮТ собственный фон/обводку (.toolbar input/select) —
+   так пользователь по-прежнему различает три отдельных сабблока внутри
+   объединённой рамки.
+   Высота = --control-h-md + 2px (на собственную рамку обёртки), чтобы
+   при box-sizing: border-box внешний бокс совпал с .level-filter. */
+.time-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: calc(var(--control-h-md) + 2px);
+  padding: 3px var(--space-2);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+.time-filter > label,
+.time-filter .quick-range-select-wrap {
+  gap: var(--space-2);
+}
+.time-filter .quick-ranges { gap: var(--space-1); }
+
+/* ===================== Group: фильтр сортировки ===================== */
+.sort-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: calc(var(--control-h-md) + 2px);
+  padding: 3px var(--space-2);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+
+/* ===================== Group: append + compact чекбоксы ===================== */
+.append-mode-check,
+.compact-mode-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  user-select: none;
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+}
+.append-mode-check:hover,
+.compact-mode-check:hover { color: var(--color-fg-default); background: var(--color-surface-2); }
+.append-mode-check input,
+.compact-mode-check input { accent-color: var(--color-accent); cursor: pointer; margin: 0; }
+.append-mode-check:has(input:checked),
+.compact-mode-check:has(input:checked) { color: var(--color-accent); }
+
+
+/* ===================== Group: чипы сервисов ===================== */
 .toolbar-services-wrap {
   flex-basis: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+  border-top: 1px dashed var(--color-divider);
+  margin-top: var(--space-1);
 }
-.toolbar-services-wrap .services-label { color: var(--text-muted); font-size: 12px; margin-right: 4px; }
-
-.toolbar label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 12px;
+.toolbar-services-wrap .services-label {
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-right: var(--space-1);
 }
-.toolbar input, .toolbar select {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 12px;
-}
-.toolbar input[type="text"] { min-width: 160px; }
-.toolbar input[type="datetime-local"] { font-family: var(--font-mono); }
 .services-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-1);
   align-items: center;
 }
-.service-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  user-select: none;
-}
-.service-chip.hidden { opacity: 0.4; text-decoration: line-through; }
-.service-chip:hover { border-color: var(--text-muted); }
-.level-filter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 14px;
-}
-.level-filter-label { color: var(--text-muted); font-size: 12px; margin-right: 4px; }
-.level-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--text);
-  cursor: pointer;
-  user-select: none;
-}
-.level-check input { accent-color: var(--info); cursor: pointer; }
-.quick-ranges {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-}
-.quick-ranges-label {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-right: 4px;
-}
-.quick-range-btn {
-  padding: 4px 8px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 11px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-  user-select: none;
-}
-.quick-range-btn:hover {
-  border-color: var(--info);
-  color: var(--info);
-}
-.quick-range-btn.active {
-  background: var(--info);
-  border-color: var(--info);
-  color: #fff;
-}
-.quick-range-btn.quick-range-clear {
-  color: var(--text-muted);
-  font-weight: 600;
-  min-width: 24px;
-  text-align: center;
-}
-.quick-range-btn.quick-range-clear:hover {
-  border-color: var(--error);
-  color: var(--error);
-}
-.quick-range-btn.quick-range-clear.active {
-  /* кнопка «очистить» не имеет активного состояния */
-  background: var(--bg);
-  border-color: var(--border);
-  color: var(--text-muted);
-}
-.append-mode-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  cursor: pointer;
-  user-select: none;
-}
-.append-mode-check input { accent-color: var(--info); cursor: pointer; }
 
+
+/* ============================================================
+   11. Список логов
+   ============================================================ */
 .log-list-wrap {
   flex: 1;
   overflow: auto;
-  padding: 12px 20px;
+  padding: var(--space-3) var(--space-4);
+  scrollbar-gutter: stable;
+  background: var(--color-bg-canvas);
 }
 
-/* Кнопка "Загрузить ещё" сверху списка для tail-пагинации */
+.log-list {
+  /* max-width: var(--content-max-width); */
+  margin: 0 auto;
+}
+
+/* Кнопка «Загрузить ещё» */
 .load-more-wrap {
   display: none;
   justify-content: center;
-  padding: 0 0 12px;
+  padding: 0 0 var(--space-3);
 }
 .load-more-wrap.visible { display: flex; }
 .load-more-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  color: var(--text-muted);
-  border-radius: var(--radius);
+  gap: var(--space-2);
+  height: var(--control-h-md);
+  padding: 0 var(--space-4);
+  background: var(--color-surface-1);
+  border: 1px dashed var(--color-border-default);
+  color: var(--color-fg-muted);
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-family: inherit;
-  font-size: 12px;
-  transition: all 0.15s;
+  font-size: var(--font-size-sm);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 .load-more-btn:hover {
-  border-color: var(--info);
-  color: var(--info);
-  background: var(--info-tint);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-style: solid;
 }
 .load-more-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.load-more-info {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-left: 8px;
-  font-family: var(--font-mono);
-}
 
+
+/* ===================== Строка лога ===================== */
 .log-entry {
   display: grid;
-  grid-template-columns: 160px 70px minmax(120px, max-content) 1fr;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  margin-bottom: 6px;
+  grid-template-columns: 168px 64px minmax(120px, max-content) 1fr;
+  gap: var(--space-3);
+  padding: 7px var(--space-3) 7px var(--space-3);
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 12px;
-  align-items: start;
-  border-left: 3px solid transparent;
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  /* Выравниваем колонки по типографической базовой линии: текст времени,
+     бейдж уровня, бейдж сервиса и первая строка сообщения (вместе с
+     trace-бейджем внутри неё) встают на одну и ту же линию. */
+  align-items: baseline;
   word-break: break-word;
-  background: var(--row-bg);
-  border-bottom: 1px solid var(--border);
+  background: var(--color-row-bg);
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--color-divider);
+  transition: background var(--duration-fast) var(--ease-out);
 }
+/* Zebra-stripe для ритма чтения */
+.log-entry:nth-child(even of .log-entry) { background: var(--color-row-zebra); }
+.log-entry:hover { background: var(--color-row-hover); }
+
+.log-entry.level-ERROR { border-left-color: var(--color-danger); }
+.log-entry.level-WARN  { border-left-color: var(--color-warning); }
+.log-entry.level-INFO  { border-left-color: var(--color-accent); }
+.log-entry.level-DEBUG { border-left-color: var(--color-debug); }
+/* На ERROR-строке hover чуть «розовее» — даёт быстрый scan-сигнал */
+.log-entry.level-ERROR:hover { background: color-mix(in srgb, var(--color-danger) 8%, var(--color-row-hover)); }
+.log-entry.level-WARN:hover  { background: color-mix(in srgb, var(--color-warning) 6%, var(--color-row-hover)); }
+
 @media (max-width: 900px) {
   .log-entry {
     grid-template-columns: 1fr 1fr;
@@ -485,357 +1046,451 @@ header {
   }
   .log-entry .log-extra { grid-column: 1 / -1; }
 }
-.log-entry.level-ERROR { border-left-color: var(--error); background: var(--error-tint); }
-.log-entry.level-WARN  { border-left-color: var(--warn);  background: var(--warn-tint); }
-.log-entry.level-INFO  { border-left-color: var(--info); background: var(--row-bg); }
-.log-entry.level-DEBUG { border-left-color: var(--debug); background: var(--debug-tint); }
-.log-entry:hover { background: var(--row-hover); }
+
+/* Live-вспышка для новых строк — короткая и мягкая */
 .log-entry.live-new {
-  animation: live-flash 1s ease-out;
+  animation: live-flash 700ms var(--ease-out);
 }
 @keyframes live-flash {
-  0% { background: var(--live-flash); }
-  100% { background: var(--row-bg); }
+  0%   { background: var(--live-flash); }
+  100% { background: var(--color-row-bg); }
 }
 
 .log-time {
-  color: var(--text-muted);
+  color: var(--color-fg-muted);
   white-space: nowrap;
-  /* cursor: help визуально намекает, что при наведении появится подсказка
-     с полной временной меткой — день недели, время с миллисекундами,
-     таймзона, ISO 8601, «N минут назад». Пункт 6.3 плана улучшений. */
+  font-variant-numeric: tabular-nums;
   cursor: help;
-  /* Подчёркивание точечной линией — традиционный для веба визуальный
-     сигнал «здесь есть подсказка». Делаем его очень бледным, чтобы не
-     перетягивать внимание; на :hover чуть усиливаем. */
-  text-decoration: underline dotted var(--border);
+  text-decoration: underline dotted var(--color-border-default);
   text-underline-offset: 3px;
 }
-.log-time:hover {
-  text-decoration-color: var(--text-muted);
+.log-time:hover { text-decoration-color: var(--color-fg-muted); }
+
+/* Бейдж уровня — pill с заливкой semantic-цветом.
+   Метрики высоты/padding/line-height и box-sizing синхронизированы
+   с .log-service и .log-trace-badge, чтобы все три «пилюли» выглядели
+   как одно семейство и стояли на одной горизонтальной линии. */
+.log-level {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  width: max-content;
+  min-width: 56px;
+  line-height: 1;
 }
-.log-level  { font-weight: 500; }
-.log-level.level-ERROR { color: var(--error); }
-.log-level.level-WARN  { color: var(--warn); }
-.log-level.level-INFO  { color: var(--info); }
-.log-level.level-DEBUG { color: var(--debug); }
+.log-level.level-ERROR { background: var(--color-danger);   color: var(--color-fg-on-accent); }
+.log-level.level-WARN  { background: var(--color-warning);  color: #1A2233; }
+.log-level.level-INFO  { background: var(--color-accent-soft); color: var(--color-accent); }
+.log-level.level-DEBUG { background: var(--color-debug-soft); color: var(--color-debug); }
+
 .log-service {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--border);
-  color: var(--text);
+  box-sizing: border-box;
+  height: 20px;
+  font-size: var(--font-size-xs);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-3);
+  color: var(--color-fg-default);
   width: fit-content;
   min-width: 120px;
   white-space: nowrap;
+  line-height: 1;
 }
-.log-msg { color: var(--text); }
+.log-msg { color: var(--color-fg-default); }
+
 mark.search-match {
-  background: var(--match-bg);
-  color: var(--match-fg);
-  padding: 0 2px;
-  border-radius: 2px;
-  font-weight: 500;
+  background: var(--color-match-bg);
+  color: var(--color-match-fg);
+  padding: 0 3px;
+  border-radius: var(--radius-xs);
+  font-weight: 600;
 }
 .log-extra {
   grid-column: 1 / -1;
-  margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
-  font-size: 11px;
-  color: var(--text-muted);
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px dashed var(--color-divider);
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
 }
-.log-extra summary { cursor: pointer; }
-.log-extra pre { margin: 4px 0 0; overflow-x: auto; }
-.log-extra pre mark.search-match {
-  color: var(--match-fg);
+.log-extra summary {
+  cursor: pointer;
+  padding: 2px 0;
+  user-select: none;
 }
+.log-extra summary:hover { color: var(--color-fg-default); }
+.log-extra pre {
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2);
+  overflow-x: auto;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-snug);
+}
+.log-extra pre mark.search-match { color: var(--color-match-fg); }
 
+
+/* ============================================================
+   12. Empty state
+   ============================================================ */
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
-  color: var(--text-muted);
+  padding: var(--space-10) var(--space-5);
+  color: var(--color-fg-muted);
+  max-width: 480px;
+  margin: 0 auto;
 }
-.empty-state p { margin: 8px 0; }
-.stats { font-size: 12px; color: var(--text-muted); }
+.empty-state::before {
+  content: '';
+  display: block;
+  width: 64px; height: 64px;
+  margin: 0 auto var(--space-4);
+  background-color: var(--color-fg-subtle);
+  opacity: 0.4;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><polyline points='14 2 14 8 20 8'/><line x1='9' y1='13' x2='15' y2='13'/><line x1='9' y1='17' x2='15' y2='17'/></svg>") no-repeat center / contain;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><polyline points='14 2 14 8 20 8'/><line x1='9' y1='13' x2='15' y2='13'/><line x1='9' y1='17' x2='15' y2='17'/></svg>") no-repeat center / contain;
+}
+.empty-state p { margin: var(--space-2) 0; line-height: var(--line-base); }
+.empty-state strong { color: var(--color-fg-default); font-weight: 600; }
 
-/* === Модальное окно === */
+.stats {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+
+/* ============================================================
+   13. Модальное окно
+   ============================================================ */
 .modal-overlay {
   display: none;
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: var(--modal-overlay);
+  inset: 0;
+  background: var(--color-modal-overlay);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 1000;
   align-items: center;
   justify-content: center;
+  animation: overlay-in var(--duration-base) var(--ease-out);
 }
 .modal-overlay.active { display: flex; }
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 .modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  width: 90%;
-  max-width: 800px;
-  max-height: 85vh;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  width: 92%;
+  max-width: 760px;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--modal-shadow-strong);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+  animation: modal-in var(--duration-slow) var(--ease-out);
 }
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
 .modal-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-surface-1);
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
-.modal-title { font-weight: 600; font-size: 1.1rem; }
+.modal-title { font-weight: 600; font-size: var(--font-size-lg); }
 .modal-close {
-  background: none; border: none;
-  color: var(--text-muted);
+  background: none;
+  border: none;
+  color: var(--color-fg-muted);
   font-size: 24px;
+  line-height: 1;
   cursor: pointer;
-  padding: 0; line-height: 1;
+  width: 32px; height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
 }
-.modal-close:hover { color: var(--text); }
-.modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+.modal-close:hover { color: var(--color-fg-default); background: var(--color-surface-3); }
+
+.modal-body {
+  padding: var(--space-4);
+  overflow-y: auto;
+  flex: 1;
+}
 .modal-footer {
-  padding: 16px 20px;
-  border-top: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-divider);
   display: flex;
-  gap: 12px;
+  gap: var(--space-2);
   justify-content: flex-end;
+  background: var(--color-surface-1);
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
 
-/* === Селектор режима в модалке === */
+
+/* ===================== Селектор режима загрузки ===================== */
 .load-mode-selector {
   display: flex;
-  gap: 8px;
-  padding: 4px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-bottom: 12px;
+  gap: 3px;
+  padding: 3px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
 }
 .load-mode-option {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   cursor: pointer;
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  transition: all 0.15s;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  transition: all var(--duration-fast) var(--ease-out);
   user-select: none;
 }
-.load-mode-option:hover { color: var(--text); }
+.load-mode-option:hover { color: var(--color-fg-default); background: var(--color-surface-3); }
 .load-mode-option input { display: none; }
 .load-mode-option.active {
-  background: var(--info);
-  color: #fff;
-  font-weight: 500;
+  background: var(--color-surface-1);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-1);
+  border: 1px solid var(--color-accent);
 }
 .load-mode-option-icon { font-size: 14px; }
 
+
+/* ===================== Конфигурация режима ===================== */
 .mode-config {
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  padding: var(--space-3) var(--space-3);
+  margin-bottom: var(--space-4);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
 }
 .mode-config-label {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 8px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-fg-subtle);
+  margin-bottom: var(--space-2);
   display: block;
 }
 .mode-config-row {
   display: flex;
-  gap: 16px;
+  gap: var(--space-3);
   flex-wrap: wrap;
   align-items: center;
 }
 .mode-config-row label {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
+  color: var(--color-fg-muted);
 }
 .mode-config input[type="datetime-local"],
 .mode-config input[type="number"] {
-  padding: 6px 10px;
-  font-size: 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text);
+  height: var(--control-h-md);
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-1);
+  color: var(--color-fg-default);
   font-family: var(--font-mono);
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 .mode-config input[type="number"] { width: 100px; }
 .mode-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 8px;
-  line-height: 1.5;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-subtle);
+  margin-top: var(--space-2);
+  line-height: var(--line-base);
 }
 
-/* Серверный grep: общий блок «Содержит» располагается между селектором
-   режима и mode-specific конфигом. Визуально отделяем тонкой границей сверху. */
 .mode-config-shared {
-  margin-top: 8px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--border);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--color-divider);
 }
-
-/* Строка с текстовым полем и чекбоксами рядом. */
 .mode-config-row-grep {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
-
 .mode-config-row-grep input[type="text"] {
   flex: 1 1 220px;
   min-width: 0;
-  padding: 6px 10px;
+  height: var(--control-h-md);
+  padding: 0 var(--space-3);
   font-family: var(--font-mono);
-  font-size: 13px;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
-.mode-config-row-grep input[type="text"]:focus {
-  outline: none;
-  border-color: var(--info);
+  font-size: var(--font-size-md);
+  background: var(--color-surface-1);
+  color: var(--color-fg-default);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 
 .grep-flag-label {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
-  color: var(--text-muted);
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface);
+  color: var(--color-fg-muted);
+  padding: 4px var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-1);
+  transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
 }
-
-.grep-flag-label:hover {
-  color: var(--text);
-  border-color: var(--text-muted);
-}
-
-.grep-flag-label input[type="checkbox"] {
-  margin: 0;
-  cursor: pointer;
-}
-
-/* Состояние "включено" даём не через :has (не везде поддерживается),
-   а через JS — но даже без него галочка явно видна. Если нужно
-   подсвечивать активный чекбокс, добавьте :has-вариант:
-   .grep-flag-label:has(input:checked) { color: var(--info); border-color: var(--info); }
-   Современные Chrome/Firefox/Safari (2023+) это поддерживают. */
+.grep-flag-label:hover { color: var(--color-fg-default); border-color: var(--color-border-strong); }
+.grep-flag-label input[type="checkbox"] { margin: 0; cursor: pointer; }
 .grep-flag-label:has(input:checked) {
-  color: var(--info);
-  border-color: var(--info);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
 }
 
-/* === Список серверов === */
+
+/* ===================== Список серверов (legacy секции) ===================== */
 .server-section {
-  margin-bottom: 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 .server-header {
-  background: var(--bg);
-  padding: 8px 12px;
+  background: var(--color-surface-2);
+  padding: var(--space-2) var(--space-3);
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
 }
-.server-header:hover { background: var(--row-subtle); }
-.server-info { display: flex; align-items: center; gap: 8px; }
-.server-name { font-weight: 500; font-size: 13px; }
-.server-host { color: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
+.server-header:hover { background: var(--color-surface-3); }
+.server-info { display: flex; align-items: center; gap: var(--space-2); }
+.server-name { font-weight: 600; font-size: var(--font-size-md); }
+.server-host { color: var(--color-fg-muted); font-size: var(--font-size-xs); font-family: var(--font-mono); }
 .server-status {
-  padding: 2px 6px;
-  border-radius: 3px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-xs);
   font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
-.server-status.connected { background: var(--success-status-tint); color: var(--success); }
-.server-status.error { background: var(--error-status-tint); color: var(--error); }
-.server-status.pending { background: var(--info-status-tint); color: var(--info); }
+.server-status.connected { background: var(--color-success-soft); color: var(--color-success); }
+.server-status.error     { background: var(--color-danger-soft);  color: var(--color-danger); }
+.server-status.pending   { background: var(--color-accent-soft);  color: var(--color-accent); }
 
-.server-files { padding: 8px 10px; background: var(--surface); }
+.server-files { padding: var(--space-2); background: var(--color-surface-1); }
 .file-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
+  gap: var(--space-2);
+  padding: 5px var(--space-2);
   margin: 2px 0;
-  background: var(--bg);
-  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
-.file-item:hover { background: var(--row-hover); }
-.file-item.selected { background: var(--info-tint-strong); border: 1px solid var(--info); }
+.file-item:hover { background: var(--color-row-hover); }
+.file-item.selected {
+  background: var(--color-row-selected);
+  border-color: var(--color-accent);
+}
 .file-item.live-active {
-  background: var(--error-tint);
-  border: 1px solid var(--error);
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
 }
-.file-checkbox { width: 14px; height: 14px; accent-color: var(--info); }
-.file-name { flex: 1; font-size: 12px; }
-.file-path { color: var(--text-muted); font-size: 10px; font-family: var(--font-mono); }
+.file-checkbox { width: 14px; height: 14px; accent-color: var(--color-accent); }
+.file-name { flex: 1; font-size: var(--font-size-sm); font-weight: 500; }
+.file-path { color: var(--color-fg-muted); font-size: 10px; font-family: var(--font-mono); }
 .file-live-badge {
   font-size: 9px;
-  background: var(--error);
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-fg-on-accent);
   padding: 1px 5px;
-  border-radius: 3px;
-  font-weight: 500;
+  border-radius: var(--radius-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
+
+/* ============================================================
+   14. Спиннеры и прогресс
+   ============================================================ */
 .loading-spinner {
   display: inline-block;
   width: 16px; height: 16px;
-  border: 2px solid var(--border);
-  border-top-color: var(--info);
+  border: 2px solid var(--color-border-default);
+  border-top-color: var(--color-accent);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .stream-progress {
-  margin: 12px 0;
-  padding: 12px;
-  background: var(--surface);
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
 }
 .stream-progress-bar {
   height: 6px;
-  background: var(--border);
-  border-radius: 3px;
+  background: var(--color-border-default);
+  border-radius: var(--radius-full);
   overflow: hidden;
-  margin: 8px 0;
+  margin: var(--space-2) 0;
 }
 .stream-progress-fill {
   height: 100%;
-  background: var(--info);
-  border-radius: 3px;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
   transition: width 0.2s ease;
 }
 .stream-progress-fill.indeterminate {
@@ -843,49 +1498,54 @@ mark.search-match {
   animation: indeterminate 1.5s ease-in-out infinite;
 }
 @keyframes indeterminate {
-  0% { margin-left: -30%; }
+  0%   { margin-left: -30%; }
   100% { margin-left: 100%; }
 }
 .stream-progress-text {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
   display: flex;
   justify-content: space-between;
 }
 .stream-file-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 4px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-fg-default);
+  margin-bottom: var(--space-1);
 }
 
+/* Универсальная карточка с сообщением об ошибке */
 .error-message {
-  background: var(--error-tint);
-  border: 1px solid var(--error);
-  border-radius: 6px;
-  padding: 12px;
-  color: var(--error);
-  margin: 12px 0;
+  background: var(--color-danger-soft);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  color: var(--color-danger);
+  margin: var(--space-3) 0;
+  font-size: var(--font-size-md);
 }
 
-/* === Баннер подключения live-потоков === */
+
+/* ============================================================
+   15. Live-loading-banner
+   ============================================================ */
 .live-loading-banner {
   display: none;
-  margin: 0 0 12px;
-  padding: 12px 14px;
-  background: var(--info-tint);
-  border: 1px solid var(--info);
-  border-radius: var(--radius);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  background: var(--color-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  border-radius: var(--radius-md);
 }
 .live-loading-banner.visible { display: block; }
 .live-loading-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 8px;
+  gap: var(--space-2);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-fg-default);
+  margin-bottom: var(--space-2);
 }
 .live-loading-list {
   display: flex;
@@ -895,185 +1555,153 @@ mark.search-match {
 .live-loading-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 12px;
+  gap: var(--space-2);
+  padding: 6px var(--space-2);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
 }
-.live-loading-item .loading-spinner {
-  width: 12px;
-  height: 12px;
-  border-width: 2px;
-  flex-shrink: 0;
-}
-.live-loading-item.success { border-color: var(--success); }
+.live-loading-item .loading-spinner { width: 12px; height: 12px; border-width: 2px; flex-shrink: 0; }
+.live-loading-item.success { border-color: var(--color-success); }
 .live-loading-item.success .loading-spinner { display: none; }
-.live-loading-item.success .live-loading-check {
-  color: var(--success);
-  font-weight: 600;
-}
-.live-loading-item.error {
-  border-color: var(--error);
-  background: var(--error-tint);
-}
+.live-loading-item.success .live-loading-check { color: var(--color-success); font-weight: 700; }
+.live-loading-item.error { border-color: var(--color-danger); background: var(--color-danger-soft); }
 .live-loading-item.error .loading-spinner { display: none; }
-.live-loading-item.error .live-loading-check {
-  color: var(--error);
-  font-weight: 600;
-}
-.live-loading-check {
-  display: inline-block;
-  width: 12px;
-  text-align: center;
-  flex-shrink: 0;
-}
+.live-loading-item.error .live-loading-check { color: var(--color-danger); font-weight: 700; }
+.live-loading-check { display: inline-block; width: 12px; text-align: center; flex-shrink: 0; }
 .live-loading-item-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--font-mono);
 }
 .live-loading-item-status {
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-xs);
   white-space: nowrap;
 }
 .live-loading-progress {
   height: 3px;
-  background: var(--border);
-  border-radius: 2px;
+  background: var(--color-border-default);
+  border-radius: var(--radius-full);
   overflow: hidden;
-  margin-top: 8px;
+  margin-top: var(--space-2);
   position: relative;
 }
 .live-loading-progress::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 0; left: 0;
   height: 100%;
   width: 30%;
-  background: var(--info);
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
   animation: live-loading-slide 1.5s ease-in-out infinite;
 }
 @keyframes live-loading-slide {
-  0% { left: -30%; }
+  0%   { left: -30%; }
   100% { left: 100%; }
 }
 .live-loading-banner.all-done .live-loading-progress { display: none; }
 
 .no-servers {
   text-align: center;
-  padding: 40px;
-  color: var(--text-muted);
+  padding: var(--space-10);
+  color: var(--color-fg-muted);
 }
-.no-servers a { color: var(--info); }
+.no-servers a { color: var(--color-accent); }
 
-.refresh-btn { padding: 4px 8px; font-size: 11px; }
-.select-all-btn {
-  padding: 4px 10px;
-  font-size: 11px;
-  white-space: nowrap;
-}
-.select-all-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.refresh-btn { padding: 0 var(--space-2); height: 24px; font-size: var(--font-size-xs); }
+.select-all-btn { padding: 0 var(--space-3); height: 24px; font-size: var(--font-size-xs); white-space: nowrap; }
+.select-all-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* === Переключатель темы === */
-.theme-toggle {
-  padding: 0;
-  width: 36px;
-  height: 36px;
-  justify-content: center;
-  align-items: center;
-  flex-shrink: 0;
-}
-.theme-toggle svg {
-  width: 18px;
-  height: 18px;
-  display: none;
-}
-:root[data-theme="dark"] .theme-toggle .theme-icon-sun { display: block; }
-:root[data-theme="light"] .theme-toggle .theme-icon-moon { display: block; }
 
 /* ============================================================
- * Дополнения для группировки/трассировки по traceId.
- * Этот блок добавляет новые классы для работы с traceId.
- * ============================================================ */
+   16. Переключатель темы
+   ============================================================ */
+.theme-toggle {
+  padding: 0;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-fg-muted);
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+.theme-toggle:hover { background: var(--color-surface-3); color: var(--color-fg-default); border-color: var(--color-border-strong); }
+.theme-toggle svg { width: 16px; height: 16px; display: none; }
+:root[data-theme="dark"]  .theme-toggle .theme-icon-sun  { display: block; }
+:root[data-theme="light"] .theme-toggle .theme-icon-moon { display: block; }
 
-/* Бейдж traceId внутри строки лога. Кликабельная инлайн-«таблетка» перед
-   текстом сообщения. Стабильный цвет приходит из render.js через CSS-переменную
-   --trace-color (рассчитывается из хэша traceId, см. utils.js → traceIdColor). */
+
+/* ============================================================
+   17. Trace badge + баннер фильтра по trace
+   ============================================================ */
 .log-trace-badge {
   display: inline-flex;
   align-items: center;
+  /* Бейдж сидит внутри .log-msg. vertical-align: baseline ставит его
+     на ту же типографическую линию, что и текст сообщения, а grid строки
+     уже выровнен по baseline — поэтому бейдж совпадает по высоте с
+     .log-level и .log-service в соседних колонках. */
   vertical-align: baseline;
+  box-sizing: border-box;
+  height: 20px;
   font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
-  padding: 2px 6px;
+  padding: 0 8px;
   margin-right: 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
   user-select: none;
-  background: color-mix(in srgb, var(--trace-color, var(--info)) 15%, transparent);
-  color: var(--trace-color, var(--info));
-  border: 1px solid color-mix(in srgb, var(--trace-color, var(--info)) 40%, transparent);
-  transition: background 0.12s, border-color 0.12s, transform 0.05s;
+  background: color-mix(in srgb, var(--trace-color, var(--color-accent)) 14%, transparent);
+  color: var(--trace-color, var(--color-accent));
+  border: 1px solid color-mix(in srgb, var(--trace-color, var(--color-accent)) 35%, transparent);
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), transform var(--duration-instant) var(--ease-out);
 }
 .log-trace-badge:hover {
-  background: color-mix(in srgb, var(--trace-color, var(--info)) 28%, transparent);
-  border-color: color-mix(in srgb, var(--trace-color, var(--info)) 70%, transparent);
+  background: color-mix(in srgb, var(--trace-color, var(--color-accent)) 24%, transparent);
+  border-color: color-mix(in srgb, var(--trace-color, var(--color-accent)) 60%, transparent);
 }
-.log-trace-badge:active {
-  transform: translateY(1px);
-}
+.log-trace-badge:active { transform: translateY(1px); }
 .log-trace-badge.active {
-  background: var(--trace-color, var(--info));
-  color: #fff;
-  border-color: var(--trace-color, var(--info));
+  background: var(--trace-color, var(--color-accent));
+  color: var(--color-fg-on-accent);
+  border-color: var(--trace-color, var(--color-accent));
 }
 
-/* Фолбэк для браузеров без color-mix (старее ~2023):
-   простая полупрозрачная подложка по основному цвету. */
 @supports not (background: color-mix(in srgb, red 50%, transparent)) {
-  .log-trace-badge {
-    background: var(--info-tint);
-    border-color: var(--border);
-  }
-  .log-trace-badge:hover { background: var(--info-tint-strong); }
+  .log-trace-badge { background: var(--color-accent-soft); border-color: var(--color-border-default); }
+  .log-trace-badge:hover { background: var(--color-accent-soft-hover); }
 }
 
-/* Баннер активного фильтра по traceId. Появляется между toolbar и log-list-wrap,
-   когда выставлен state.currentTraceFilter. Видимостью управляет render.js. */
 .trace-filter-banner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 20px;
-  background: var(--info-tint-strong);
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--text);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-accent-soft);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-default);
 }
-.trace-filter-label {
-  color: var(--text-muted);
-  white-space: nowrap;
-}
+.trace-filter-label { color: var(--color-fg-muted); white-space: nowrap; font-weight: 500; }
 .trace-filter-value {
   font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-default);
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 60ch;
@@ -1081,67 +1709,57 @@ mark.search-match {
 }
 .trace-filter-clear {
   margin-left: auto;
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-muted);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-xs);
+  color: var(--color-fg-muted);
   cursor: pointer;
   font-family: inherit;
   font-size: 14px;
   line-height: 1;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
 .trace-filter-clear:hover {
-  border-color: var(--error);
-  color: var(--error);
-  background: var(--error-tint);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
 }
 
-/* ============================================================
- * Toast-уведомления.
- * Этот блок добавляет стили для неблокирующих уведомлений.
- * ============================================================ */
 
-/* Контейнер тостов. Фиксированно в правом нижнем углу. pointer-events: none,
-   чтобы пустое пространство контейнера не перехватывало клики по интерфейсу;
-   сами тосты возвращают pointer-events: auto. */
+/* ============================================================
+   18. Toast-уведомления
+   ============================================================ */
 .toast-container {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  right: var(--space-4);
+  bottom: var(--space-4);
   z-index: 2000;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-2);
   align-items: stretch;
   width: min(420px, calc(100vw - 32px));
   pointer-events: none;
 }
 
-/* Тост. Используем CSS Grid: три колонки (иконка / контент / крестик),
-   и при необходимости — отдельная строка под кнопки действий (toast-actions
-   занимает всю ширину). */
 .toast {
   pointer-events: auto;
   display: grid;
   grid-template-columns: 22px 1fr auto;
-  column-gap: 12px;
+  column-gap: var(--space-3);
   align-items: start;
-  padding: 12px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--info);
-  border-radius: var(--radius);
-  box-shadow: var(--modal-shadow);
-  font-size: 13px;
-  color: var(--text);
-  animation: toast-in 0.18s ease-out;
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-default);
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+  font-size: var(--font-size-md);
+  color: var(--color-fg-default);
+  animation: toast-in var(--duration-slow) var(--ease-out);
 }
-
-.toast.toast-hide {
-  animation: toast-out 0.18s ease-in forwards;
-}
+.toast.toast-hide { animation: toast-out var(--duration-base) var(--ease-out) forwards; }
 
 .toast-icon {
   font-weight: 700;
@@ -1150,277 +1768,218 @@ mark.search-match {
   text-align: center;
   user-select: none;
 }
-
 .toast-content { min-width: 0; }
-
-.toast-title {
-  font-weight: 600;
-  margin-bottom: 2px;
-  line-height: 1.3;
-}
-
+.toast-title  { font-weight: 600; margin-bottom: 2px; line-height: var(--line-snug); }
 .toast-message {
-  line-height: 1.4;
+  line-height: var(--line-base);
   word-wrap: break-word;
-  /* pre-line чтобы поддерживать \n из сообщений типа «Ошибки при загрузке:\n…» */
   white-space: pre-line;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
 }
-
 .toast-close {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--color-fg-muted);
   cursor: pointer;
   padding: 0;
   font-size: 18px;
   line-height: 1;
   align-self: start;
   margin-top: -1px;
+  width: 22px; height: 22px;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
 }
-.toast-close:hover { color: var(--text); }
+.toast-close:hover { color: var(--color-fg-default); background: var(--color-surface-3); }
 
-/* Полоса с кнопками действий внутри toastConfirm */
 .toast-actions {
   grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 .toast-action-btn {
-  padding: 5px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
+  padding: 5px var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-1);
+  color: var(--color-fg-default);
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
-.toast-action-btn:hover {
-  background: var(--btn-hover);
-  border-color: var(--text-muted);
-}
+.toast-action-btn:hover { background: var(--color-surface-3); border-color: var(--color-border-strong); }
 .toast-action-btn.primary {
-  background: var(--info);
-  border-color: var(--info);
-  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-fg-on-accent);
 }
-.toast-action-btn.primary:hover {
-  background: var(--btn-primary-hover);
-  border-color: var(--btn-primary-hover);
-}
+.toast-action-btn.primary:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
 .toast-action-btn.danger {
-  background: var(--error);
-  border-color: var(--error);
-  color: #fff;
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-fg-on-accent);
 }
-.toast-action-btn.danger:hover {
-  background: var(--btn-danger-hover);
-  border-color: var(--btn-danger-hover);
-}
+.toast-action-btn.danger:hover { background: var(--btn-danger-hover); border-color: var(--btn-danger-hover); }
 
-/* Типы тостов: цвет левой полосы и иконки */
-.toast.toast-success { border-left-color: var(--success); }
-.toast.toast-success .toast-icon { color: var(--success); }
-
-.toast.toast-info    { border-left-color: var(--info); }
-.toast.toast-info    .toast-icon { color: var(--info); }
-
-.toast.toast-warn    { border-left-color: var(--warn); }
-.toast.toast-warn    .toast-icon { color: var(--warn); }
-
-.toast.toast-error   { border-left-color: var(--error); background: var(--error-tint); }
-.toast.toast-error   .toast-icon { color: var(--error); }
+.toast.toast-success { border-left-color: var(--color-success); }
+.toast.toast-success .toast-icon { color: var(--color-success); }
+.toast.toast-info    { border-left-color: var(--color-accent); }
+.toast.toast-info    .toast-icon { color: var(--color-accent); }
+.toast.toast-warn    { border-left-color: var(--color-warning); }
+.toast.toast-warn    .toast-icon { color: var(--color-warning); }
+.toast.toast-error   { border-left-color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 6%, var(--color-surface-raised)); }
+.toast.toast-error   .toast-icon { color: var(--color-danger); }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translateX(20px) scale(0.98); }
+  to   { opacity: 1; transform: translateX(0)    scale(1); }
 }
 @keyframes toast-out {
   from { opacity: 1; transform: translateX(0); }
   to   { opacity: 0; transform: translateX(20px); }
 }
-
-/* На узких экранах растягиваем тосты на всю ширину. */
 @media (max-width: 600px) {
-  .toast-container {
-    right: 8px;
-    left: 8px;
-    bottom: 8px;
-    width: auto;
-  }
+  .toast-container { right: var(--space-2); left: var(--space-2); bottom: var(--space-2); width: auto; }
 }
+
 
 /* ============================================================
- * Подсветка цветом и иконками для сервисов.
- * Этот блок переопределяет цвета через CSS-переменную --service-color
- * и добавляет геометрию для .service-icon.
- *
- * --service-color приходит из render.js через inline-style.
- * Цвет вычисляется из имени сервиса (utils.js → serviceColor) — стабильно
- * один и тот же для одного и того же имени. Иконка (.service-icon)
- * подбирается оттуда же — см. serviceIcon().
- * ============================================================ */
-
-/* Чип сервиса в фильтре. Существующее правило .service-chip задаёт
-   геометрию (padding, gap, font, cursor) — здесь только переопределяем цвета.
-   color-mix дает мягкий тинт фона и приглушённый текст того же тона. */
+   19. Сервисы: чипы и цветные бейджи
+   ------------------------------------------------------------
+   --service-color приходит из render.js через inline-style.
+   ============================================================ */
 .service-chip {
-  background: color-mix(in srgb, var(--service-color, transparent) 14%, var(--bg));
-  border-color: color-mix(in srgb, var(--service-color, var(--border)) 45%, var(--border));
-  color: color-mix(in srgb, var(--service-color, var(--text)) 80%, var(--text));
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  background: color-mix(in srgb, var(--service-color, transparent) 14%, var(--color-surface-1));
+  border: 1px solid color-mix(in srgb, var(--service-color, var(--color-border-default)) 40%, var(--color-border-default));
+  color: color-mix(in srgb, var(--service-color, var(--color-fg-default)) 80%, var(--color-fg-default));
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), transform var(--duration-instant) var(--ease-out);
 }
 .service-chip:hover {
-  background: color-mix(in srgb, var(--service-color, transparent) 22%, var(--bg));
-  border-color: color-mix(in srgb, var(--service-color, var(--text-muted)) 70%, var(--border));
+  background: color-mix(in srgb, var(--service-color, transparent) 24%, var(--color-surface-1));
+  border-color: color-mix(in srgb, var(--service-color, var(--color-fg-muted)) 70%, var(--color-border-default));
+  transform: translateY(-1px);
+}
+.service-chip:active { transform: translateY(0); }
+
+.service-chip.hidden {
+  opacity: 0.45;
+  text-decoration: line-through;
+  background: var(--color-surface-2);
+  border-color: var(--color-border-default);
+  color: var(--color-fg-muted);
 }
 
 .service-chip .service-label,
-.log-service  .service-label {
-  line-height: 1;
-}
+.log-service  .service-label { line-height: 1; }
 
-/* Скрытый чип — гасим цвет до нейтрального серого. Существующее правило
-   `.service-chip.hidden { opacity: 0.4; text-decoration: line-through; }`
-   остаётся в силе и комбинируется с этим. */
-.service-chip.hidden {
-  background: var(--bg);
-  border-color: var(--border);
-  color: var(--text-muted);
-}
-
-/* Столбец сервиса в строке лога. Существующее правило .log-service задаёт
-   фон var(--border) и цвет var(--text). Переопределяем под --service-color
-   и переводим в inline-flex, чтобы иконка и подпись выровнялись по центру
-   с зазором. */
 .log-service {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: color-mix(in srgb, var(--service-color, var(--border)) 18%, var(--surface));
-  color: color-mix(in srgb, var(--service-color, var(--text)) 60%, var(--text));
-  border: 1px solid color-mix(in srgb, var(--service-color, var(--border)) 28%, transparent);
-  padding: 1px 7px;
+  background: color-mix(in srgb, var(--service-color, var(--color-border-default)) 18%, var(--color-surface-1));
+  color: color-mix(in srgb, var(--service-color, var(--color-fg-default)) 70%, var(--color-fg-default));
+  border: 1px solid color-mix(in srgb, var(--service-color, var(--color-border-default)) 28%, transparent);
+  /* padding и высота заданы в базовом правиле .log-service выше — там
+     же box-sizing: border-box и height: 20px, поэтому 1px border входит
+     в общую высоту и pill остаётся одинаковым с .log-level. */
+  padding: 0 var(--space-2);
   cursor: default;
 }
 
-/* Фолбэк для браузеров без color-mix (старее ~2023): оставляем исходный
-   нейтральный вид. Иконка остаётся видимой (контрастная по умолчанию). */
 @supports not (background: color-mix(in srgb, red 50%, transparent)) {
   .service-chip {
-    background: var(--bg);
-    border-color: var(--border);
-    color: var(--text);
+    background: var(--color-surface-2);
+    border-color: var(--color-border-default);
+    color: var(--color-fg-default);
   }
-  .service-chip:hover { border-color: var(--text-muted); }
+  .service-chip:hover { border-color: var(--color-border-strong); }
   .log-service {
-    background: var(--border);
-    color: var(--text);
+    background: var(--color-surface-3);
+    color: var(--color-fg-default);
     border-color: transparent;
-    padding: 2px 8px;
+    padding: 0 var(--space-2);
   }
 }
 
-/* ============================================================
- * Уведомления и звуковой сигнал на ERROR.
- * Этот блок добавляет стили для чекбоксов уведомлений и звука.
- * ============================================================ */
 
+/* ============================================================
+   20. Чекбоксы алертов на ERROR
+   ============================================================ */
 .error-alert-toggles {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1);
   flex-shrink: 0;
 }
-
 .error-alert-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  font-size: 12px;
+  gap: var(--space-2);
+  height: var(--control-h-md);
+  padding: 0 var(--space-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
 }
-
-.error-alert-toggle:hover {
-  border-color: var(--text-muted);
-  color: var(--text);
-}
+.error-alert-toggle:hover { border-color: var(--color-border-strong); color: var(--color-fg-default); background: var(--color-surface-3); }
 
 .error-alert-toggle input[type="checkbox"] {
-  /* Прячем системный чекбокс — состояние видно по обрамлению ярлыка */
   appearance: none;
   -webkit-appearance: none;
-  width: 0;
-  height: 0;
+  width: 0; height: 0;
   margin: 0;
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
-/* Эмодзи-иконки 🔔/🔊 приглушаем в выключенном состоянии через grayscale,
-   и поднимаем в полную силу при включении. */
 .error-alert-icon {
   font-size: 14px;
   line-height: 1;
-  filter: grayscale(1) opacity(0.7);
-  transition: filter 0.15s;
+  filter: grayscale(1) opacity(0.6);
+  transition: filter var(--duration-fast) var(--ease-out);
 }
+.error-alert-label { line-height: 1; font-size: var(--font-size-sm); }
 
-.error-alert-label {
-  line-height: 1;
-}
-
-/* Скрываем подпись на узких экранах — иконки достаточно */
-@media (max-width: 800px) {
+@media (max-width: 880px) {
   .error-alert-label { display: none; }
-  .error-alert-toggle { padding: 6px 8px; }
+  .error-alert-toggle { padding: 0 var(--space-2); }
 }
 
-/* Активное состояние галочки. :has() поддержан во всех современных браузерах. */
 .error-alert-toggle:has(input:checked) {
-  background: var(--info-tint);
-  border-color: var(--info);
-  color: var(--info);
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
-.error-alert-toggle:has(input:checked) .error-alert-icon {
-  filter: none;
-}
+.error-alert-toggle:has(input:checked) .error-alert-icon { filter: none; }
+.error-alert-toggle:has(input:disabled) { opacity: 0.5; cursor: not-allowed; }
 
-/* Заблокированное состояние (например, Notification API недоступен
-   или разрешение denied — error-alerts.js может проставить disabled) */
-.error-alert-toggle:has(input:disabled) {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Focus-стиль для клавиатурной навигации */
-.error-alert-toggle:focus-within {
-  outline: 2px solid var(--info);
-  outline-offset: 2px;
-}
 
 /* ============================================================
- * Мини-спарклайн со статистикой по уровням.
- * Узкая полоса под тулбаром с гистограммой количества записей по
- * уровням ERROR/WARN/INFO/DEBUG за выбранное окно. Логика в
- * public/sparkline.js. Полностью использует существующие CSS-
- * переменные темы (--bg/--surface/--border/--error/...).
- * ============================================================ */
-
+   21. Спарклайн
+   ============================================================ */
 .sparkline-wrap {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 6px 20px 8px;
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-divider);
+  padding: var(--space-2) var(--space-4) var(--space-2);
   position: relative;
 }
 .sparkline-wrap[hidden] { display: none; }
@@ -1428,73 +1987,67 @@ mark.search-match {
 .sparkline-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 4px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
   flex-wrap: wrap;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 .sparkline-title {
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--color-fg-subtle);
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 500;
+  letter-spacing: 0.06em;
+  font-weight: 700;
 }
 .sparkline-window-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 11px;
+  gap: var(--space-1);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-xs);
 }
 .sparkline-window-label select {
-  padding: 2px 6px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 4px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-fg-default);
+  border-radius: var(--radius-xs);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
 }
 
-/* Сводка цифр справа в шапке */
 .sparkline-stats {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text);
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-default);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
-.sparkline-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
+.sparkline-stat { display: inline-flex; align-items: center; gap: var(--space-1); }
 .sparkline-stat-dot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 8px; height: 8px;
   border-radius: 2px;
 }
-.sparkline-stats-total { color: var(--text-muted); }
+.sparkline-stats-total { color: var(--color-fg-muted); }
 
 .sparkline-toggle {
-  padding: 2px 8px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-muted);
-  font-size: 11px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-xs);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-xs);
   font-family: inherit;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
-.sparkline-toggle:hover {
-  color: var(--text);
-  border-color: var(--text-muted);
-}
+.sparkline-toggle:hover { color: var(--color-fg-default); border-color: var(--color-border-strong); }
 
 .sparkline-canvas-wrap { position: relative; }
 .sparkline-canvas {
@@ -1502,145 +2055,100 @@ mark.search-match {
   width: 100%;
   height: 44px;
   cursor: pointer;
-  background: var(--bg);
-  border-radius: 4px;
-  border: 1px solid var(--border);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--color-border-subtle);
 }
-.sparkline-canvas:hover { border-color: var(--text-muted); }
+.sparkline-canvas:hover { border-color: var(--color-border-default); }
 
 .sparkline-axis {
   display: flex;
   justify-content: space-between;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--color-fg-subtle);
   margin-top: 2px;
   padding: 0 2px;
   pointer-events: none;
 }
 
-/* Свёрнутое состояние: видна только шапка с цифрами и кнопкой.
-   Канвас и подпись оси скрыты, но summary-цифры в шапке продолжают
-   обновляться в live-режиме. */
 .sparkline-wrap.collapsed .sparkline-canvas-wrap,
-.sparkline-wrap.collapsed .sparkline-axis {
-  display: none;
-}
-.sparkline-wrap.collapsed {
-  padding-bottom: 6px;
-}
-.sparkline-wrap.collapsed .sparkline-header {
-  margin-bottom: 0;
-}
+.sparkline-wrap.collapsed .sparkline-axis { display: none; }
+.sparkline-wrap.collapsed { padding-bottom: var(--space-2); }
+.sparkline-wrap.collapsed .sparkline-header { margin-bottom: 0; }
 
-/* Тултип над канвасом */
 .sparkline-tooltip {
   display: none;
   position: absolute;
   z-index: 50;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 10px;
-  box-shadow: var(--modal-shadow);
-  font-size: 11px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  box-shadow: var(--shadow-2);
+  font-size: var(--font-size-xs);
   font-family: var(--font-mono);
-  color: var(--text);
+  color: var(--color-fg-default);
   pointer-events: none;
   white-space: nowrap;
-  min-width: 180px;
+  min-width: 200px;
 }
-.sparkline-tt-time {
-  font-weight: 600;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 3px;
-}
-.sparkline-tt-dur { color: var(--text-muted); font-weight: 400; }
-.sparkline-tt-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  line-height: 1.6;
-}
-.sparkline-tt-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-.sparkline-tt-row b {
-  margin-left: auto;
-  font-weight: 600;
-}
-.sparkline-tt-total {
-  margin-top: 4px;
-  padding-top: 3px;
-  border-top: 1px solid var(--border);
-  color: var(--text-muted);
-}
-.sparkline-tt-total b { color: var(--text); font-weight: 600; }
-.sparkline-tt-hint {
-  margin-top: 4px;
-  font-size: 10px;
-  color: var(--text-muted);
-  font-style: italic;
-}
+.sparkline-tt-time { font-weight: 600; margin-bottom: var(--space-1); border-bottom: 1px solid var(--color-divider); padding-bottom: 3px; }
+.sparkline-tt-dur  { color: var(--color-fg-muted); font-weight: 400; }
+.sparkline-tt-row  { display: flex; align-items: center; gap: var(--space-1); line-height: 1.6; }
+.sparkline-tt-dot  { display: inline-block; width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.sparkline-tt-row b { margin-left: auto; font-weight: 600; }
+.sparkline-tt-total { margin-top: var(--space-1); padding-top: 3px; border-top: 1px solid var(--color-divider); color: var(--color-fg-muted); }
+.sparkline-tt-total b { color: var(--color-fg-default); font-weight: 600; }
+.sparkline-tt-hint { margin-top: var(--space-1); font-size: 10px; color: var(--color-fg-muted); font-style: italic; }
 
 @media (max-width: 800px) {
-  .sparkline-wrap { padding: 6px 12px; }
+  .sparkline-wrap { padding: var(--space-2) var(--space-3); }
   .sparkline-stats { display: none; }
   .sparkline-title { display: none; }
 }
 
-/* Чекбокс «Компактно» в шапке. Стилизуем под существующий .append-mode-check,
-   чтобы шапка осталась визуально цельной. */
-.compact-mode-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  cursor: pointer;
-  user-select: none;
-}
-.compact-mode-check input { accent-color: var(--info); cursor: pointer; }
- 
-/* Применение компактного режима к строкам логов */
- 
+
+/* ============================================================
+   22. Компактный режим
+   ============================================================ */
 :root[data-compact="true"] .log-entry {
-  padding: 3px 8px;
-  margin-bottom: 2px;
-  font-size: 11px;
-  grid-template-columns: 160px 70px max-content 1fr;
-  gap: 8px;
+  padding: 3px var(--space-2);
+  font-size: var(--font-size-xs);
+  grid-template-columns: 156px 56px max-content 1fr;
+  gap: var(--space-2);
+  border-left-width: 2px;
 }
- 
-/* На узких экранах исходные правила переопределяют grid-template-columns
-   на двухколоночный layout — там компакт-режим не имеет особого смысла,
-   но паддинг и шрифт всё равно уменьшаются. */
 @media (max-width: 900px) {
-  :root[data-compact="true"] .log-entry {
-    grid-template-columns: 1fr 1fr;
-  }
+  :root[data-compact="true"] .log-entry { grid-template-columns: 1fr 1fr; }
 }
- 
-/* Сервис в компакте: только иконка, текст спрятан. display:none у .service-label,
-   чтобы span не занимал пустое место. Иконка остаётся видна и сохраняет --service-color.
-   Tooltip приходит с .log-service из render.js и продолжает работать. */
 :root[data-compact="true"] .log-service {
+  /* В компактном режиме pill-ы становятся 18px высотой — у всех трёх
+     (.log-level / .log-service / .log-trace-badge) общая высота, padding
+     и line-height, чтобы они оставались на одной линии и одинаковыми. */
+  height: 18px;
   padding: 0 5px;
   min-width: 0;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   gap: 0;
+  /* В компактном режиме имя сервиса всё равно показываем —
+     цвета сервисов слишком близки, чтобы быть единственным маркером.
+     Длинные имена обрежем многоточием, полное имя останется в title. */
+  max-width: 156px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 :root[data-compact="true"] .log-service .service-label {
-  display: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
- 
-/* Раскрытый блок «Доп. поля» в компакте — плотнее. Это второстепенный
-   контент: его уменьшение экономит много места при разворачивании нескольких записей. */
+:root[data-compact="true"] .log-level {
+  height: 18px;
+  min-width: 48px;
+  font-size: 9px;
+  padding: 0 6px;
+}
 :root[data-compact="true"] .log-extra {
   margin-top: 2px;
   padding-top: 3px;
@@ -1649,201 +2157,171 @@ mark.search-match {
 :root[data-compact="true"] .log-extra pre {
   font-size: 10px;
   margin-top: 2px;
+  padding: var(--space-1) var(--space-2);
 }
- 
-/* Левая цветовая полоска (border-left) — тоньше для уменьшения высоты строки.
-   Цвет уровня остаётся тем же. */
-:root[data-compact="true"] .log-entry {
-  border-left-width: 2px;
-}
- 
-/* Бейдж traceId — ужать вертикально, чтобы не торчал над соседним текстом сообщения. */
 :root[data-compact="true"] .log-trace-badge {
-  padding: 0 4px;
-  font-size: 10px;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 9px;
 }
 
-/* Фильтр уровней в модалке «Диапазон дат». Стили аналогичны .level-filter
-   в toolbar, но адаптированы под .mode-config-row и @media модалки. */
+
+/* ============================================================
+   23. Фильтр уровней внутри модалки
+   ============================================================ */
 .remote-level-checks {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 16px;
+  gap: var(--space-2) var(--space-3);
   align-items: center;
 }
 .remote-level-check {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--text);
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-default);
   cursor: pointer;
   user-select: none;
 }
-.remote-level-check input { accent-color: var(--info); cursor: pointer; }
+.remote-level-check input { accent-color: var(--color-accent); cursor: pointer; }
+.remote-level-check:has(input:checked) { color: var(--color-accent); }
 
-/* Состояния чекбоксов уровней: подсвечиваем текст и рамку при :has(input:checked). */
-.remote-level-check:has(input:checked) {
-  color: var(--info);
-}
 
 /* ============================================================
- * Подсветка синтаксиса JSON в дополнительных полях логов.
- * Применяется только внутри .log-extra pre, где render.js
- * вставляет результат highlightJson(JSON.stringify(...)).
- *
- * Цвета задаются как CSS-переменные, чтобы тёмная и светлая
- * темы переопределяли только их.
- * ============================================================ */
-
+   24. Подсветка JSON в Доп. полях
+   ============================================================ */
 :root,
 :root[data-theme="dark"] {
-  --json-key:     #9cdcfe;   /* светло-голубой — ключ объекта */
-  --json-string:  #ce9178;   /* лосось — строковое значение */
-  --json-number:  #b5cea8;   /* пастельный зелёный — число */
-  --json-boolean: #c586c0;   /* лавандовый — true/false */
-  --json-null:    #8b949e;   /* серый (== --text-muted) — null */
+  --json-key:     #9ECBFF;
+  --json-string:  #E5A672;
+  --json-number:  #B5CEA8;
+  --json-boolean: #C586C0;
+  --json-null:    #7E89A4;
 }
-
 :root[data-theme="light"] {
-  --json-key:     #0451a5;   /* тёмно-синий */
-  --json-string:  #a31515;   /* бордовый */
-  --json-number:  #098658;   /* тёмно-зелёный */
-  --json-boolean: #af00db;   /* фиолетовый */
-  --json-null:    #6e7681;   /* серый (чуть темнее --text-muted, для контраста на белом) */
+  --json-key:     #0451A5;
+  --json-string:  #A31515;
+  --json-number:  #098658;
+  --json-boolean: #AF00DB;
+  --json-null:    #5B657D;
 }
-
-/* Сами классы — внутри .log-extra pre, чтобы не «утечь» в другие <pre> на странице. */
-.log-extra pre .json-key     { color: var(--json-key);     font-weight: 500; }
+.log-extra pre .json-key     { color: var(--json-key);     font-weight: 600; }
 .log-extra pre .json-string  { color: var(--json-string); }
 .log-extra pre .json-number  { color: var(--json-number); }
-.log-extra pre .json-boolean { color: var(--json-boolean); font-weight: 500; }
+.log-extra pre .json-boolean { color: var(--json-boolean); font-weight: 600; }
 .log-extra pre .json-null    { color: var(--json-null); font-style: italic; }
 
-/* ====================== Селектор часового пояса ====================== */
 
+/* ============================================================
+   25. Селектор часового пояса
+   ============================================================ */
 .tz-selector-wrap {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   cursor: pointer;
+  color: var(--color-fg-muted);
 }
-
 .tz-selector-icon {
-  font-size: 14px;
-  line-height: 1;
-  pointer-events: none;
-  user-select: none;
+  width: 14px; height: 14px;
+  flex-shrink: 0;
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/></svg>") no-repeat center / contain;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/></svg>") no-repeat center / contain;
 }
-
 .tz-selector {
   appearance: none;
   -webkit-appearance: none;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-default);
   font-family: var(--font-mono);
-  font-size: 11px;
-  padding: 3px 22px 3px 7px;
+  font-size: var(--font-size-xs);
+  height: var(--control-h-md);
+  padding: 0 22px 0 var(--space-2);
   cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239AA4B8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 6px center;
-  transition: border-color 0.15s, color 0.15s;
-  max-width: 160px;
+  background-position: right var(--space-2) center;
+  transition: border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+  max-width: 180px;
 }
+.tz-selector:hover { border-color: var(--color-border-strong); }
 
-.tz-selector:hover {
-  border-color: var(--info);
-  color: var(--text);
-}
-
-.tz-selector:focus {
-  outline: 2px solid var(--info);
-  outline-offset: 1px;
-  color: var(--text);
-}
-
-/* В компактном режиме шапка плотнее — немного уменьшаем селектор */
 :root[data-compact="true"] .tz-selector {
   font-size: 10px;
-  padding: 2px 20px 2px 6px;
+  height: 26px;
+  padding: 0 20px 0 6px;
 }
 
-/* =====================================================================
-   Вкладки модального окна
-   ===================================================================== */
 
+/* ============================================================
+   26. Вкладки модального окна
+   ============================================================ */
 .modal-tabs {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   flex: 1;
 }
-
 .modal-tab {
   background: none;
   border: 1px solid transparent;
-  border-radius: 6px;
-  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  color: var(--color-fg-muted);
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
-  padding: 6px 14px;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  padding: 5px var(--space-3);
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
-.modal-tab:hover {
-  background: var(--row-hover);
-  color: var(--text);
-}
+.modal-tab:hover { background: var(--color-surface-3); color: var(--color-fg-default); }
 .modal-tab.active {
-  background: var(--info);
-  border-color: var(--info);
-  color: #fff;
+  background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  color: var(--color-accent);
 }
 
-/* Glob-бейдж на файле с wildcards */
+
+/* ============================================================
+   27. Glob-бейджи и секции
+   ============================================================ */
 .glob-badge {
   display: inline-block;
   font-size: 9px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(139, 148, 158, 0.2);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--color-fg-muted) 18%, transparent);
+  color: var(--color-fg-muted);
+  border: 1px solid var(--color-border-default);
   vertical-align: middle;
-  margin-left: 4px;
+  margin-left: var(--space-1);
 }
 
-/* ---------------------------------------------------------------------
-   Glob-секция в списке файлов: исходный паттерн + раскрытые файлы.
-   --------------------------------------------------------------------- */
 .glob-section {
-  margin: 4px 0;
-  border-left: 2px solid var(--border);
-  padding-left: 6px;
+  margin: var(--space-1) 0;
+  border-left: 2px solid var(--color-border-default);
+  padding-left: var(--space-2);
 }
 .glob-section-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
-  padding: 4px 4px;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+  padding: 4px;
 }
-.glob-section-icon {
-  display: inline-block;
-  font-weight: 700;
-  color: var(--text-muted);
-}
+.glob-section-icon { display: inline-block; font-weight: 700; color: var(--color-fg-muted); }
 .glob-section-pattern {
   font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1851,100 +2329,53 @@ mark.search-match {
 .glob-section-base-name {
   margin-left: auto;
   font-size: 10px;
-  color: var(--text-muted);
-  opacity: 0.7;
+  color: var(--color-fg-subtle);
   white-space: nowrap;
 }
-.glob-section-count {
-  font-size: 10px;
-  color: var(--text-muted);
-  padding: 2px 4px 4px;
-}
-.glob-section-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
-  padding: 6px 8px;
-  font-style: italic;
-}
-.glob-section-status-error {
-  color: var(--error);
-  font-style: normal;
-}
-.glob-section-status-empty {
-  color: var(--text-muted);
-}
-.glob-file-item {
-  margin-left: 4px;
-}
+.glob-section-count { font-size: 10px; color: var(--color-fg-muted); padding: 2px 4px 4px; }
+.glob-section-status { display: flex; align-items: center; gap: var(--space-1); font-size: var(--font-size-xs); color: var(--color-fg-muted); padding: 6px var(--space-2); font-style: italic; }
+.glob-section-status-error { color: var(--color-danger); font-style: normal; }
+.glob-section-status-empty { color: var(--color-fg-muted); }
+.glob-file-item { margin-left: 4px; }
 
-/* =====================================================================
-   Вкладка «Серверы» — карточки и формы
-   ===================================================================== */
 
-.settings-tab {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+/* ============================================================
+   28. Карточки серверов и формы
+   ============================================================ */
+.settings-tab { display: flex; flex-direction: column; gap: var(--space-3); }
+.settings-empty { color: var(--color-fg-muted); text-align: center; padding: var(--space-6); }
 
-.settings-empty {
-  color: var(--text-muted);
-  text-align: center;
-  padding: 24px;
-}
-
-/* Карточка сервера */
 .settings-server-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
   overflow: hidden;
+  background: var(--color-surface-1);
+  transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
 }
+.settings-server-card:hover { border-color: var(--color-border-strong); }
 
 .settings-server-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  background: var(--bg);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2);
 }
 
 .settings-server-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2);
   flex: 1;
   min-width: 0;
   flex-wrap: wrap;
 }
+.settings-server-name { font-weight: 600; font-size: var(--font-size-md); }
+.settings-server-addr { font-size: var(--font-size-xs); font-family: var(--font-mono); color: var(--color-fg-muted); }
+.settings-server-user { font-size: var(--font-size-xs); color: var(--color-fg-muted); }
+.settings-server-actions { display: flex; gap: var(--space-1); flex-shrink: 0; }
 
-.settings-server-name {
-  font-weight: 600;
-  font-size: 13px;
-}
-.settings-server-addr {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-}
-.settings-server-user {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.settings-server-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-/* Секция файлов внутри карточки */
-.settings-files-section {
-  border-top: 1px solid var(--border);
-}
-
+.settings-files-section { border-top: 1px solid var(--color-divider); }
 .settings-files-toggle {
   display: flex;
   align-items: center;
@@ -1952,188 +2383,107 @@ mark.search-match {
   width: 100%;
   background: none;
   border: none;
-  padding: 8px 14px;
+  padding: 6px var(--space-3);
   font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
 }
-.settings-files-toggle:hover {
-  background: var(--row-hover);
-  color: var(--text);
-}
-
-.settings-files-arrow {
-  font-size: 10px;
-  opacity: 0.6;
-}
+.settings-files-toggle:hover { background: var(--color-row-hover); color: var(--color-fg-default); }
+.settings-files-arrow { font-size: 10px; opacity: 0.6; }
 
 .settings-files-list {
-  padding: 6px 10px 10px;
+  padding: var(--space-1) var(--space-2) var(--space-2);
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-
-/* Строка файла */
 .settings-file-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 4px;
+  gap: var(--space-2);
+  padding: 6px var(--space-2);
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
-  transition: background 0.15s;
+  transition: background var(--duration-fast) var(--ease-out);
 }
-.settings-file-row:hover {
-  background: var(--row-hover);
-}
+.settings-file-row:hover { background: var(--color-row-hover); }
 
-.settings-file-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  flex-wrap: wrap;
-}
+.settings-file-info { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0; flex-wrap: wrap; }
+.settings-file-name { font-size: var(--font-size-sm); font-weight: 500; }
+.settings-file-path { font-size: 10px; font-family: var(--font-mono); color: var(--color-fg-muted); word-break: break-all; }
+.settings-file-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
-.settings-file-name {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.settings-file-path {
-  font-size: 10px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-  word-break: break-all;
-}
-
-.settings-file-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.settings-add-file-wrap {
-  padding-top: 6px;
-}
-
-.settings-add-file-btn {
-  font-size: 12px;
-  padding: 4px 10px;
-  opacity: 0.8;
-}
+.settings-add-file-wrap { padding-top: var(--space-1); }
+.settings-add-file-btn { font-size: var(--font-size-sm); padding: 0 var(--space-3); height: 26px; opacity: 0.85; }
 .settings-add-file-btn:hover { opacity: 1; }
+.settings-add-wrap { padding: var(--space-1) 0 2px; }
+.settings-add-btn { width: 100%; height: var(--control-h-lg); }
 
-/* Кнопка добавить сервер */
-.settings-add-wrap {
-  padding: 4px 0 2px;
-}
-.settings-add-btn {
-  width: 100%;
-}
 
-/* =====================================================================
-   Форма сервера / файла
-   ===================================================================== */
-
+/* ===================== Форма ===================== */
 .settings-server-form {
-  border: 1px solid var(--info);
-  border-radius: var(--radius);
-  padding: 16px;
-  background: var(--surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--color-surface-1);
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
 }
-
 .settings-file-form {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px;
-  background: var(--bg);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--color-surface-2);
   margin-bottom: 4px;
 }
 
-.settings-form-title {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: var(--text);
-}
-
-.settings-form-title-sm {
-  font-size: 12px;
-  margin-bottom: 8px;
-}
+.settings-form-title { font-size: var(--font-size-md); font-weight: 600; margin-bottom: var(--space-3); color: var(--color-fg-default); }
+.settings-form-title-sm { font-size: var(--font-size-sm); margin-bottom: var(--space-2); }
 
 .settings-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px 16px;
-  margin-bottom: 12px;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-3);
 }
-
 .settings-file-form-grid {
   display: grid;
   grid-template-columns: 1fr 2fr;
-  gap: 10px 16px;
-  margin-bottom: 10px;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-2);
 }
-
-.settings-form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.settings-form-group-small {
-  max-width: 130px;
-}
-
-.settings-form-group-full {
-  grid-column: 1 / -1;
-}
+.settings-form-group { display: flex; flex-direction: column; gap: 4px; }
+.settings-form-group-small { max-width: 130px; }
+.settings-form-group-full { grid-column: 1 / -1; }
 
 .settings-form-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .settings-form-input {
-  padding: 7px 10px;
-  font-size: 13px;
+  padding: 0 var(--space-3);
+  height: var(--control-h-lg);
+  font-size: var(--font-size-md);
   font-family: var(--font-ui);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-1);
+  color: var(--color-fg-default);
   width: 100%;
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
-.settings-form-input:focus {
-  outline: none;
-  border-color: var(--info);
-}
-.settings-form-input.input-error {
-  border-color: var(--error);
-}
+.settings-form-input.input-error { border-color: var(--color-danger); }
 
-/* Поле пароля с переключателем */
-.settings-password-wrap {
-  position: relative;
-  display: flex;
-  gap: 6px;
-}
-.settings-password-wrap .settings-form-input {
-  flex: 1;
-  padding-right: 38px;
-}
+.settings-password-wrap { position: relative; display: flex; gap: var(--space-1); }
+.settings-password-wrap .settings-form-input { flex: 1; padding-right: 38px; }
 .settings-password-toggle {
   position: absolute;
-  right: 8px;
+  right: var(--space-2);
   top: 50%;
   transform: translateY(-50%);
   background: none;
@@ -2141,180 +2491,142 @@ mark.search-match {
   cursor: pointer;
   font-size: 14px;
   padding: 2px;
-  opacity: 0.5;
-  transition: opacity 0.15s;
+  opacity: 0.55;
+  transition: opacity var(--duration-fast) var(--ease-out);
   line-height: 1;
 }
 .settings-password-toggle:hover { opacity: 1; }
 
-/* Путь к файлу с кнопкой «Просмотр» */
-.settings-file-path-wrap {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-.settings-file-path-wrap .settings-form-input {
-  flex: 1;
-}
+.settings-file-path-wrap { display: flex; gap: var(--space-1); align-items: center; }
+.settings-file-path-wrap .settings-form-input { flex: 1; }
 
 .settings-form-hint {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-top: 4px;
-  line-height: 1.4;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+  margin-top: var(--space-1);
+  line-height: var(--line-base);
 }
 .settings-form-hint code {
-  background: var(--bg);
-  padding: 1px 4px;
-  border-radius: 3px;
+  background: var(--color-surface-2);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
   font-family: var(--font-mono);
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border-subtle);
+  font-size: var(--font-size-xs);
 }
 
-/* Кнопки «Отмена / Сохранить» */
-.settings-form-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
+.settings-form-actions { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
+.settings-conn-status { font-size: var(--font-size-sm); padding: 3px var(--space-2); border-radius: var(--radius-xs); }
+.settings-conn-status.pending   { background: var(--color-accent-soft);  color: var(--color-accent); }
+.settings-conn-status.connected { background: var(--color-success-soft); color: var(--color-success); }
+.settings-conn-status.error     { background: var(--color-danger-soft);  color: var(--color-danger); }
 
-/* Статус соединения в форме */
-.settings-conn-status {
-  font-size: 12px;
-  padding: 3px 8px;
-  border-radius: 4px;
-}
-.settings-conn-status.pending  {
-  background: var(--info-status-tint);
-  color: var(--info);
-}
-.settings-conn-status.connected {
-  background: var(--success-status-tint);
-  color: var(--success);
-}
-.settings-conn-status.error {
-  background: var(--error-status-tint);
-  color: var(--error);
-}
 
-/* =====================================================================
-   Glob-превью
-   ===================================================================== */
-
+/* ===================== Glob-превью ===================== */
 .glob-preview-list {
-  margin-top: 6px;
-  font-size: 11px;
-  border-radius: 4px;
+  margin-top: var(--space-2);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm);
   overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
 }
-
 .glob-preview-header {
-  padding: 4px 8px;
-  background: var(--success-status-tint);
-  color: var(--success);
-  font-weight: 500;
-  border-radius: 4px 4px 0 0;
+  padding: 4px var(--space-2);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  font-weight: 600;
+  font-size: var(--font-size-xs);
 }
-
 .glob-preview-file {
-  padding: 3px 8px;
+  padding: 3px var(--space-2);
   font-family: var(--font-mono);
-  background: var(--bg);
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  color: var(--text-muted);
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-fg-muted);
   word-break: break-all;
 }
-.glob-preview-file:last-child {
-  border-radius: 0 0 4px 4px;
-}
+.glob-preview-file:last-child { border-bottom: none; }
+.glob-preview-info { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-fg-muted); padding: 4px 0; }
+.glob-preview-error { color: var(--color-danger); padding: 4px 0; }
 
-.glob-preview-info {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  padding: 4px 0;
-}
 
-.glob-preview-error {
-  color: var(--error);
-  padding: 4px 0;
-}
-
-/* =====================================================================
-   Переключатель типа сервера (SSH / Локальный)
-   ===================================================================== */
-
-.settings-type-selector {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
+/* ============================================================
+   29. Переключатель типа сервера
+   ============================================================ */
+.settings-type-selector { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .settings-type-option {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  gap: var(--space-2);
+  padding: 7px var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 13px;
-  transition: background 0.15s, border-color 0.15s;
+  font-size: var(--font-size-md);
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
   user-select: none;
 }
-.settings-type-option:hover {
-  background: var(--row-hover);
-}
-.settings-type-option input[type="radio"] {
-  accent-color: var(--info);
-  width: 14px;
-  height: 14px;
-}
+.settings-type-option:hover { background: var(--color-row-hover); }
+.settings-type-option input[type="radio"] { accent-color: var(--color-accent); width: 14px; height: 14px; }
 .settings-type-option:has(input:checked) {
-  border-color: var(--info);
-  background: var(--info-tint);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
 }
 
-/* Подсказка под переключателем типа */
-.settings-form-hint {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-.settings-form-hint code {
-  font-family: var(--font-mono);
-  background: var(--row-hover);
-  padding: 1px 4px;
-  border-radius: 3px;
-}
-
-/* Бейдж «📁 Локальный» в карточке сервера */
 .local-server-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--success-status-tint);
-  color: var(--success);
+  font-size: var(--font-size-xs);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--color-success-soft);
+  color: var(--color-success);
   border: 1px solid transparent;
+  font-weight: 600;
 }
 
-/* Маленькая опасная кнопка */
-.btn-xs {
-  font-size: 11px;
-  padding: 3px 8px;
-  line-height: 1.4;
+
+/* ============================================================
+   30. Скелетоны — для асинхронных загрузок
+   ============================================================ */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-sm);
 }
-.btn-danger {
-  background: transparent;
-  border-color: transparent;
-  color: var(--error);
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-fg-default) 6%, transparent) 50%,
+    transparent 100%
+  );
+  animation: skeleton-shimmer 1.4s infinite var(--ease-in-out);
 }
-.btn-danger:hover {
-  background: var(--error-tint);
-  border-color: var(--error);
+.skeleton-line { height: 12px; margin: 6px 0; }
+.skeleton-line.short  { width: 60%; }
+.skeleton-line.medium { width: 80%; }
+.skeleton-line.long   { width: 100%; }
+@keyframes skeleton-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+
+/* ============================================================
+   31. Адаптив для больших мониторов
+   ============================================================ */
+@media (min-width: 1600px) {
+  .log-entry { font-size: var(--font-size-md); }
+  :root[data-compact="true"] .log-entry { font-size: var(--font-size-sm); }
+}
+
+@media (max-width: 700px) {
+  header { padding: var(--space-2) var(--space-3); }
+  .toolbar { padding: var(--space-2) var(--space-3); }
+  .log-list-wrap { padding: var(--space-2) var(--space-3); }
+  .header-divider { display: none; }
 }

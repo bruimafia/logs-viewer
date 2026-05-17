@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
   <title>Просмотр логов</title>
+  <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/styles.css">
   <script>
     // Применяем тему до рендера body, чтобы не было «вспышки» неправильной темы.
@@ -25,10 +27,7 @@
   <script>
     // Применяем компактный режим до рендера body — тогда первый paint
     // списка логов сразу окажется в нужной плотности, без видимого
-    // схлопывания после первой пере­рисовки.
-    // Логика по аналогии с темой: синхронный inline в <head>, потому
-    // что <script type="module"> имеет defer-семантику и выполнится
-    // только после парсинга разметки.
+    // схлопывания после первой перерисовки.
     (function () {
       try {
         if (localStorage.getItem('compact-mode') === '1') {
@@ -39,37 +38,62 @@
   </script>
 </head>
 <body>
+  <!-- Skip-link для клавиатурной навигации: позволяет перепрыгнуть тулбар
+       и сразу перейти к списку логов. Появляется только при фокусе. -->
+  <a class="skip-link" href="#logList">Перейти к списку логов</a>
+
   <div class="layout">
-    <header>
+    <header role="banner">
+      <!-- Зона 1: бренд страницы -->
       <span class="title">Просмотр логов</span>
-      <div class="file-input-wrap">
-        <input type="file" id="fileInput" accept=".log,.json,text/*" multiple>
-        <button type="button" class="btn btn-primary">Открыть файл(ы)</button>
+
+      <span class="header-divider" aria-hidden="true"></span>
+
+      <!-- Зона 2: основные действия загрузки данных.
+           Главная CTA «Открыть файл(ы)» — primary, рядом — secondary
+           «Удалённые файлы». Сразу за ними галочка «Добавить к открытым»,
+           чтобы пользователь видел альтернативу до клика по CTA. -->
+      <div class="header-group" role="group" aria-label="Источники данных">
+        <div class="file-input-wrap">
+          <input type="file" id="fileInput" accept=".log,.json,text/*" multiple>
+          <button type="button" class="btn btn-primary">Открыть файл(ы)</button>
+        </div>
+        <button type="button" class="btn btn-success" id="openRemoteBtn">Удалённые файлы</button>
+        <label class="append-mode-check" title="При новой загрузке добавлять записи к уже открытым">
+          <input type="checkbox" id="appendMode">
+          <span>Добавить к открытым</span>
+        </label>
       </div>
-      <button type="button" class="btn btn-success" id="openRemoteBtn">Удаленные файлы</button>
-      <label class="append-mode-check">
-        <input type="checkbox" id="appendMode">
-        <span>Добавить к открытым</span>
-      </label>
-            <!-- Компактный режим отображения.
-           Уменьшает паддинги, шрифт до 11 px и схлопывает столбец
-           сервиса до одной иконки (имя сервиса остаётся в tooltip).
-           Состояние сохраняется в localStorage['compact-mode'] и
-           применяется до рендера inline-скриптом в <head>. -->
-      <label class="compact-mode-check" title="Уменьшить высоту строк, шрифт до 11 px, столбец сервиса — только иконка">
-        <input type="checkbox" id="compactMode">
-        <span>Компактно</span>
-      </label>
-      <button type="button" class="btn" id="clearAllBtn" style="display: none;">Очистить все</button>
+
+      <span class="header-divider" aria-hidden="true"></span>
+
+      <!-- Зона 3: режим отображения и быстрая утилита «Очистить» -->
+      <div class="header-group" role="group" aria-label="Режимы отображения">
+        <!-- Компактный режим отображения.
+             Уменьшает паддинги, шрифт до 11 px и сжимает столбец сервиса
+             (длинные имена обрезаются многоточием, полное имя — в tooltip).
+             Состояние сохраняется в localStorage['compact-mode'] и
+             применяется до рендера inline-скриптом в <head>. -->
+        <label class="compact-mode-check" title="Уменьшить высоту строк и шрифт до 11 px">
+          <input type="checkbox" id="compactMode">
+          <span>Компактно</span>
+        </label>
+        <button type="button" class="btn btn-danger btn-xs" id="clearAllBtn" style="display: none;"
+                title="Очистить все открытые логи">Очистить все</button>
+      </div>
+
+      <span class="header-divider" aria-hidden="true"></span>
 
       <!-- Live-индикатор -->
       <div class="live-indicator-wrap">
         <div class="live-indicator" id="liveIndicator">
-          <span class="live-dot"></span>
+          <span class="live-dot" aria-hidden="true"></span>
           <span class="live-indicator-text">LIVE</span>
-          <span class="live-count" id="liveCount">0</span>
-          <button class="live-pause-btn" id="pauseLiveBtn" title="Поставить на паузу — отображение приостановится, приём строк продолжится">Пауза</button>
-          <button class="live-stop-btn" id="stopAllLiveBtn" title="Остановить все live-потоки">Стоп</button>
+          <span class="live-count" id="liveCount" aria-label="Количество активных потоков">0</span>
+          <button class="live-pause-btn" id="pauseLiveBtn"
+                  title="Поставить на паузу — отображение приостановится, приём строк продолжится">Пауза</button>
+          <button class="live-stop-btn" id="stopAllLiveBtn"
+                  title="Остановить все live-потоки">Стоп</button>
         </div>
         <div class="live-streams-list" id="liveStreamsList"></div>
       </div>
@@ -91,77 +115,115 @@
         </label>
       </div>
 
-      <!-- Селектор часового пояса.
-           Опции наполняются динамически из tz-selector.js. -->
-      <label class="tz-selector-wrap" title="Часовой пояс отображения временных меток">
-        <span class="tz-selector-icon" aria-hidden="true">🕐</span>
-        <select id="tzSelector" class="tz-selector" aria-label="Часовой пояс">
-          <!-- Заполняется в attachTzSelectorHandlers() -->
-        </select>
-      </label>
+      <!-- Толкатель — прижимает мета-зону к правому краю -->
+      <span class="header-spacer" aria-hidden="true"></span>
 
-      <button type="button" class="open-files-btn" id="openFilesLabel" title="Файлы не выбраны" aria-label="Файлы не выбраны">
-        <svg class="open-files-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M1.5 3.5h4l1.5 2H14.5v8H1.5z"/>
-        </svg>
-        <span class="open-files-count"></span>
-      </button>
-      <span class="stats" id="stats"></span>
-      <button type="button" class="btn theme-toggle" id="themeToggle" title="Переключить тему" aria-label="Переключить тему">
-        <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="4"></circle>
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
-        </svg>
-        <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-      </button>
+      <!-- Мета-зона: справочная информация и переключатели -->
+      <div class="header-group" role="group" aria-label="Утилиты">
+        <!-- Селектор часового пояса. Опции наполняются динамически из tz-selector.js. -->
+        <label class="tz-selector-wrap" title="Часовой пояс отображения временных меток">
+          <span class="tz-selector-icon" aria-hidden="true"></span>
+          <select id="tzSelector" class="tz-selector" aria-label="Часовой пояс">
+            <!-- Заполняется в attachTzSelectorHandlers() -->
+          </select>
+        </label>
+
+        <button type="button" class="open-files-btn" id="openFilesLabel"
+                title="Файлы не выбраны" aria-label="Файлы не выбраны">
+          <svg class="open-files-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+               stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1.5 3.5h4l1.5 2H14.5v8H1.5z"/>
+          </svg>
+          <span class="open-files-count"></span>
+        </button>
+
+        <span class="stats" id="stats" aria-live="polite"></span>
+
+        <button type="button" class="btn theme-toggle" id="themeToggle"
+                title="Переключить тему" aria-label="Переключить тему">
+          <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+          </svg>
+          <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
     </header>
 
-    <div class="toolbar">
+    <div class="toolbar" role="region" aria-label="Фильтры">
       <label>
-        Поиск
-        <input type="text" id="search" placeholder="Текст в msg или полях...">
+        <span class="sr-only">Поиск</span>
+        <input type="text" id="search" placeholder="Поиск по сообщению или полям...">
       </label>
-      <div class="level-filter">
+
+      <!-- Группа фильтра уровней — собрана в визуальный сегмент,
+           каждая опция подкрашена в свой семантический цвет. -->
+      <div class="level-filter" role="group" aria-label="Фильтр по уровням">
         <span class="level-filter-label">Уровни</span>
         <label class="level-check"><input type="checkbox" id="levelError" value="ERROR" checked> ERROR</label>
-        <label class="level-check"><input type="checkbox" id="levelWarn" value="WARN" checked> WARN</label>
-        <label class="level-check"><input type="checkbox" id="levelInfo" value="INFO" checked> INFO</label>
+        <label class="level-check"><input type="checkbox" id="levelWarn"  value="WARN"  checked> WARN</label>
+        <label class="level-check"><input type="checkbox" id="levelInfo"  value="INFO"  checked> INFO</label>
         <label class="level-check"><input type="checkbox" id="levelDebug" value="DEBUG" checked> DEBUG</label>
       </div>
-      <label>
-        С
-        <input type="datetime-local" id="timeFrom" step="1">
-      </label>
-      <label>
-        До
-        <input type="datetime-local" id="timeTo" step="1">
-      </label>
-      <div class="quick-ranges" id="quickRanges" role="group" aria-label="Быстрые временные диапазоны">
-        <span class="quick-ranges-label">Быстро:</span>
-        <button type="button" class="quick-range-btn" data-range="5m">5 мин</button>
-        <button type="button" class="quick-range-btn" data-range="15m">15 мин</button>
-        <button type="button" class="quick-range-btn" data-range="1h">1 ч</button>
-        <button type="button" class="quick-range-btn" data-range="6h">6 ч</button>
-        <button type="button" class="quick-range-btn" data-range="24h">24 ч</button>
-        <button type="button" class="quick-range-btn" data-range="7d">7 дн</button>
-        <button type="button" class="quick-range-btn" data-range="today">Сегодня</button>
-        <button type="button" class="quick-range-btn" data-range="yesterday">Вчера</button>
-        <button type="button" class="quick-range-btn quick-range-clear" data-range="clear" title="Очистить диапазон" aria-label="Очистить диапазон">×</button>
+
+      <!-- Группа фильтра временного диапазона — «С», «До» и пресет «Быстро»
+           собраны в один визуальный сегмент по аналогии с .level-filter,
+           чтобы родственные элементы тулбара выглядели как единая зона. -->
+      <div class="time-filter" role="group" aria-label="Фильтр по времени">
+        <label>
+          С
+          <input type="datetime-local" id="timeFrom" step="1">
+        </label>
+        <label>
+          ДО
+          <input type="datetime-local" id="timeTo" step="1">
+        </label>
+
+        <div class="quick-ranges" id="quickRanges" role="group" aria-label="Быстрые временные диапазоны">
+          <label class="quick-range-select-wrap">
+            <select id="quickRangeSelect" class="quick-range-select" aria-label="Быстрый временной диапазон">
+              <option value="">— быстрый диапазон —</option>
+              <optgroup label="Последние">
+                <option value="5m">5 минут</option>
+                <option value="15m">15 минут</option>
+                <option value="30m">30 минут</option>
+                <option value="1h">1 час</option>
+                <option value="3h">3 часа</option>
+                <option value="6h">6 часов</option>
+                <option value="12h">12 часов</option>
+                <option value="24h">24 часа</option>
+                <option value="7d">7 дней</option>
+              </optgroup>
+              <optgroup label="Календарь">
+                <option value="today">Сегодня</option>
+                <option value="yesterday">Вчера</option>
+              </optgroup>
+            </select>
+          </label>
+          <button type="button" class="quick-range-clear" id="quickRangeClearBtn"
+                  title="Очистить диапазон" aria-label="Очистить диапазон">×</button>
+        </div>
       </div>
-      <label>
-        Сортировка
-        <select id="sortBy">
-          <option value="time-asc">По времени (сначала старые)</option>
-          <option value="time-desc">По времени (сначала новые)</option>
-          <option value="service">По сервису</option>
-          <option value="level">По уровню</option>
-          <option value="trace">По трассе (traceId)</option>
-        </select>
-      </label>
+
+      <div class="sort-filter" role="group" aria-label="Сортировка">
+        <label>
+          Сортировка
+          <select id="sortBy">
+            <option value="time-asc">По времени (сначала старые)</option>
+            <option value="time-desc">По времени (сначала новые)</option>
+            <option value="service">По сервису</option>
+            <option value="level">По уровню</option>
+            <option value="trace">По трассе (traceId)</option>
+          </select>
+        </label>
+      </div>
+
       <div class="toolbar-services-wrap">
-        <span class="services-label">Сервисы:</span>
+        <span class="services-label">Сервисы</span>
         <div class="services-filter" id="servicesFilter"></div>
       </div>
     </div>
@@ -175,7 +237,7 @@
       <div class="sparkline-header">
         <span class="sparkline-title">Активность</span>
         <label class="sparkline-window-label">
-          Окно:
+          Окно
           <select id="sparklineWindow">
             <option value="300000">5 мин</option>
             <option value="900000">15 мин</option>
@@ -187,8 +249,8 @@
         </label>
         <span class="sparkline-stats" id="sparklineStats"></span>
         <button type="button" class="sparkline-toggle" id="sparklineToggle"
-        aria-pressed="false" aria-label="Свернуть спарклайн"
-        title="Свернуть/развернуть гистограмму">Свернуть</button>
+                aria-pressed="false" aria-label="Свернуть/развернуть гистограмму"
+                title="Свернуть/развернуть гистограмму">Свернуть</button>
       </div>
       <div class="sparkline-canvas-wrap">
         <canvas id="sparklineCanvas" class="sparkline-canvas"
@@ -203,45 +265,48 @@
     <div class="trace-filter-banner" id="traceFilterBanner" style="display: none;" role="status">
       <span class="trace-filter-label">Фильтр по трассе:</span>
       <code class="trace-filter-value" id="traceFilterValue"></code>
-      <button type="button" class="trace-filter-clear" id="traceFilterClear" title="Снять фильтр" aria-label="Снять фильтр по трассе">×</button>
+      <button type="button" class="trace-filter-clear" id="traceFilterClear"
+              title="Снять фильтр" aria-label="Снять фильтр по трассе">×</button>
     </div>
 
-    <div class="log-list-wrap" id="logListWrap">
+    <main class="log-list-wrap" id="logListWrap">
       <div class="live-loading-banner" id="liveLoadingBanner">
         <div class="live-loading-header">
-          <span class="loading-spinner"></span>
+          <span class="loading-spinner" aria-hidden="true"></span>
           <span id="liveLoadingTitle">Подключение к live-потокам...</span>
         </div>
         <div class="live-loading-list" id="liveLoadingList"></div>
-        <div class="live-loading-progress"></div>
+        <div class="live-loading-progress" aria-hidden="true"></div>
       </div>
       <div class="load-more-wrap" id="loadMoreWrap">
         <button class="load-more-btn" id="loadMoreBtn">
           <span>↑ Загрузить ещё (более старые) ↑</span>
-          <span class="load-more-info" id="loadMoreInfo"></span>
         </button>
       </div>
       <div class="log-list" id="logList">
         <div class="empty-state" id="emptyState">
           <p>Выберите один или несколько лог-файлов (JSON Lines).</p>
           <p>Логи из разных файлов будут объединены и отсортированы по времени.</p>
-          <p style="margin-top: 16px;">Или нажмите <strong>"Удаленные файлы"</strong> для загрузки с серверов.</p>
+          <p style="margin-top: 16px;">Или нажмите <strong>«Удалённые файлы»</strong> для загрузки с серверов.</p>
         </div>
         <div class="empty-state" id="noResultsState" style="display: none;">
           <p>Нет записей по заданным фильтрам.</p>
+          <p>Попробуйте расширить диапазон времени, включить дополнительные уровни или очистить поисковую строку.</p>
         </div>
       </div>
-    </div>
+    </main>
   </div>
 
-  <!-- Модальное окно удаленных файлов -->
-  <div class="modal-overlay" id="remoteModal">
+  <!-- Модальное окно удалённых файлов -->
+  <div class="modal-overlay" id="remoteModal" role="dialog" aria-modal="true"
+       aria-labelledby="remoteModalTitle">
     <div class="modal">
       <div class="modal-header">
         <nav class="modal-tabs" id="remoteModalTabs" aria-label="Разделы модального окна">
           <button class="modal-tab active" data-tab="files" aria-pressed="true">Выбрать файлы</button>
           <button class="modal-tab" data-tab="servers" aria-pressed="false">⚙ Серверы</button>
         </nav>
+        <span id="remoteModalTitle" class="sr-only">Удалённые файлы</span>
         <button class="modal-close" id="closeModal" aria-label="Закрыть">&times;</button>
       </div>
       <div class="modal-body" id="remoteModalBody">
@@ -255,7 +320,7 @@
   </div>
 
   <!-- Контейнер toast-уведомлений. -->
-  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+  <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
   <!-- Точка входа: остальные модули подгружаются через import. -->
   <script type="module" src="/public/app.js"></script>

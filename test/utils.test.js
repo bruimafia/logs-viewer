@@ -671,12 +671,15 @@ test('highlightJson: разделители между токенами идут
 
 // ====================== getQuickRange ======================
 
-test('getQuickRange: 5m/15m/1h/6h/24h/7d — N минут/часов/дней до now', () => {
+test('getQuickRange: 5m/15m/30m/1h/3h/6h/12h/24h/7d — N минут/часов/дней до now', () => {
   const now = 1_700_000_000_000;
   assert.deepEqual(getQuickRange('5m',  now), { fromMs: now -  5 * 60_000,        toMs: now });
   assert.deepEqual(getQuickRange('15m', now), { fromMs: now - 15 * 60_000,        toMs: now });
+  assert.deepEqual(getQuickRange('30m', now), { fromMs: now - 30 * 60_000,        toMs: now });
   assert.deepEqual(getQuickRange('1h',  now), { fromMs: now -      3_600_000,     toMs: now });
+  assert.deepEqual(getQuickRange('3h',  now), { fromMs: now -  3 * 3_600_000,     toMs: now });
   assert.deepEqual(getQuickRange('6h',  now), { fromMs: now -  6 * 3_600_000,     toMs: now });
+  assert.deepEqual(getQuickRange('12h', now), { fromMs: now - 12 * 3_600_000,     toMs: now });
   assert.deepEqual(getQuickRange('24h', now), { fromMs: now -      86_400_000,    toMs: now });
   assert.deepEqual(getQuickRange('7d',  now), { fromMs: now -  7 * 86_400_000,    toMs: now });
 });

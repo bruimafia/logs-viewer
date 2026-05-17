@@ -415,9 +415,10 @@ function zoomToBin(bin) {
   // Программная установка .value не триггерит события — диспатчим вручную
   dom.timeFrom.dispatchEvent(new Event('input', { bubbles: true }));
   dom.timeTo.dispatchEvent(new Event('input', { bubbles: true }));
-  // Снимаем подсветку у быстрых пресетов
-  if (dom.quickRangeButtons) {
-    dom.quickRangeButtons.forEach(b => b.classList.remove('active'));
+  // Сбрасываем выбранный пресет в выпадающем списке быстрых диапазонов —
+  // даты после клика по бину не соответствуют ни одному из пресетов.
+  if (dom.quickRangeSelect) {
+    dom.quickRangeSelect.value = '';
   }
 }
 

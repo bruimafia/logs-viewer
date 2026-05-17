@@ -26,7 +26,6 @@ import {
   closeRemoteModal,
   loadSelectedRemoteFiles
 } from './remote-modal.js';
-import { toastConfirm } from './toast.js';
 import { attachErrorAlertHandlers } from './error-alerts.js';
 import { attachSparklineHandlers } from './sparkline.js';
 import { attachTzSelectorHandlers } from './tz-selector.js';
@@ -85,7 +84,10 @@ dom.fileInput.addEventListener('change', async (e) => {
 
 document.querySelector('.file-input-wrap .btn').addEventListener('click', () => dom.fileInput.click());
 
-dom.clearAllBtn.addEventListener('click', () => {
+// Полная очистка: используется и кнопкой «Очистить все», и кнопкой «Стоп»
+// в индикаторе LIVE — пользователь хочет, чтобы остановка потоков
+// одновременно стирала все накопленные записи.
+function clearAll() {
   stopAllLive();
   clearAllLiveLoading();
   state.allLogs = [];
@@ -95,7 +97,9 @@ dom.clearAllBtn.addEventListener('click', () => {
   state.paginatedFiles.clear();
   state.currentTraceFilter = null;
   updateUI();
-});
+}
+
+dom.clearAllBtn.addEventListener('click', clearAll);
 
 // Перерисовка при изменении фильтров
 [dom.searchInput, dom.timeFrom, dom.timeTo, dom.sortBy].forEach(el => {
@@ -104,30 +108,38 @@ dom.clearAllBtn.addEventListener('click', () => {
 });
 dom.levelChecks.forEach(cb => cb.addEventListener('change', render));
 
-// Быстрые временные диапазоны: один клик заполняет timeFrom/timeTo
-// относительно текущего момента и перерисовывает список.
-dom.quickRangeButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
-    const preset = btn.dataset.range;
-    if (preset === 'clear') {
-      dom.timeFrom.value = '';
-      dom.timeTo.value = '';
-      dom.quickRangeButtons.forEach(b => b.classList.remove('active'));
-    } else {
-      const { fromMs, toMs } = getQuickRange(preset, Date.now());
-      dom.timeFrom.value = msToDatetimeLocalValue(fromMs);
-      dom.timeTo.value   = msToDatetimeLocalValue(toMs);
-      dom.quickRangeButtons.forEach(b => b.classList.toggle('active', b === btn));
-    }
+// Быстрые временные диапазоны: выбор пресета в выпадающем списке
+// заполняет timeFrom/timeTo относительно текущего момента и
+// перерисовывает список. Пустое значение опции (плейсхолдер) — это
+// «не выбран», ничего не делаем.
+if (dom.quickRangeSelect) {
+  dom.quickRangeSelect.addEventListener('change', () => {
+    const preset = dom.quickRangeSelect.value;
+    if (!preset) return;
+    const { fromMs, toMs } = getQuickRange(preset, Date.now());
+    if (fromMs == null || toMs == null) return;
+    dom.timeFrom.value = msToDatetimeLocalValue(fromMs);
+    dom.timeTo.value   = msToDatetimeLocalValue(toMs);
     // Программная установка .value НЕ триггерит 'input'/'change' — рендерим вручную.
     render();
   });
-});
+}
 
-// Если пользователь правит даты руками — снимаем подсветку выбранного пресета.
+// Кнопка очистки диапазона — сбрасывает оба datetime-поля и select.
+if (dom.quickRangeClearBtn) {
+  dom.quickRangeClearBtn.addEventListener('click', () => {
+    dom.timeFrom.value = '';
+    dom.timeTo.value = '';
+    if (dom.quickRangeSelect) dom.quickRangeSelect.value = '';
+    render();
+  });
+}
+
+// Если пользователь правит даты руками — сбрасываем выбранный пресет
+// в выпадающем списке (даты больше не соответствуют ни одному пресету).
 [dom.timeFrom, dom.timeTo].forEach(el => {
   el.addEventListener('input', () => {
-    dom.quickRangeButtons.forEach(b => b.classList.remove('active'));
+    if (dom.quickRangeSelect) dom.quickRangeSelect.value = '';
   });
 });
 
@@ -145,9 +157,9 @@ dom.loadRemoteBtn.addEventListener('click', () => loadSelectedRemoteFiles());
 
 dom.loadMoreBtn.addEventListener('click', () => loadMorePages());
 
-dom.stopAllLiveBtn.addEventListener('click', async (e) => {
+dom.stopAllLiveBtn.addEventListener('click', (e) => {
   e.stopPropagation();
-  // ... подтверждение и stopAllLive (не меняется)
+  clearAll();
 });
 
 // Пункт 3.1: пауза / возобновление live-потоков.

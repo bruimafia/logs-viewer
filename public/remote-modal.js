@@ -6,7 +6,7 @@ import { state, dom } from './state.js';
 import { escapeHtml } from './utils.js';
 import { LIVE_BUFFER_CAP } from './state.js';
 import { loadTailMode, loadRangeMode, startLiveMode } from './sse-client.js';
-import { toast } from './toast.js';
+import { toast, toastConfirm } from './toast.js';
 
 // ====================== Состояние модального окна ======================
 
@@ -890,7 +890,17 @@ async function settingsSaveServer(sid) {
 async function settingsDeleteServer(sid) {
   const server = state.remoteConfig?.servers?.find(s => s.id === sid);
   if (!server) return;
-  if (!confirm(`Удалить сервер «${server.name}»?\nФайлы на сервере не будут затронуты — удаляется только запись в конфигурации.`)) return;
+  const confirmed = await toastConfirm(
+    'Файлы на сервере не будут затронуты — удаляется только запись в конфигурации.',
+    {
+      title: `Удалить сервер «${server.name}»?`,
+      type: 'warn',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      danger: true,
+    }
+  );
+  if (!confirmed) return;
 
   const servers = (state.remoteConfig?.servers || []).filter(s => s.id !== sid);
   settingsExpandedServers.delete(sid);
@@ -943,7 +953,17 @@ async function settingsDeleteFile(serverId, fileId) {
   const server = state.remoteConfig?.servers?.find(s => s.id === serverId);
   const file = server?.files?.find(f => f.id === fileId);
   if (!file) return;
-  if (!confirm(`Удалить файл «${file.name}»?`)) return;
+  const confirmed = await toastConfirm(
+    'Запись будет удалена из конфигурации. Сам файл на сервере не будет затронут.',
+    {
+      title: `Удалить файл «${file.name}»?`,
+      type: 'warn',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      danger: true,
+    }
+  );
+  if (!confirmed) return;
 
   const servers = (state.remoteConfig?.servers || []).map(s => {
     if (s.id !== serverId) return s;
