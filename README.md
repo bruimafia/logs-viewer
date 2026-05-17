@@ -551,6 +551,14 @@ npm run test:server   # только smoke-тесты HTTP-эндпоинтов
 
 В корне лежит `logsviewer.service` — пример systemd-юнита:
 
+Перед установкой сервиса перенесите на production-сервер всю папку проекта целиком. Зависимости (node_modules) лучше установить заранее:
+
+```bash
+npm install
+```
+
+В `logsviewer.service` укажите путь к этой папке в `WorkingDirectory`. Например, если проект лежит в `/var/logs-viewer`, используйте:
+
 ```
 [Unit]
 Description=Logs Viewer Service
