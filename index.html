@@ -100,7 +100,12 @@
         </select>
       </label>
 
-      <span class="open-files" id="openFilesLabel">Файлы не выбраны</span>
+      <button type="button" class="open-files-btn" id="openFilesLabel" title="Файлы не выбраны" aria-label="Файлы не выбраны">
+        <svg class="open-files-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M1.5 3.5h4l1.5 2H14.5v8H1.5z"/>
+        </svg>
+        <span class="open-files-count"></span>
+      </button>
       <span class="stats" id="stats"></span>
       <button type="button" class="btn theme-toggle" id="themeToggle" title="Переключить тему" aria-label="Переключить тему">
         <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -233,8 +238,11 @@
   <div class="modal-overlay" id="remoteModal">
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title">Удаленные файлы</span>
-        <button class="modal-close" id="closeModal">&times;</button>
+        <nav class="modal-tabs" id="remoteModalTabs" aria-label="Разделы модального окна">
+          <button class="modal-tab active" data-tab="files" aria-pressed="true">Выбрать файлы</button>
+          <button class="modal-tab" data-tab="servers" aria-pressed="false">⚙ Серверы</button>
+        </nav>
+        <button class="modal-close" id="closeModal" aria-label="Закрыть">&times;</button>
       </div>
       <div class="modal-body" id="remoteModalBody">
         <!-- Содержимое загружается динамически -->

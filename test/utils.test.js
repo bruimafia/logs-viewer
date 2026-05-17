@@ -20,9 +20,7 @@ import {
   DEFAULT_TRACE_FIELDS,
   formatTimeFull,
   formatRelativeTime,
-  serviceColor,
-  serviceIcon,
-  SERVICE_ICON_PALETTE
+  serviceColor
 } from '../public/utils.js';
 
 // ====================== parseLogLine ======================
@@ -200,45 +198,8 @@ test('shortTraceId: пустые значения', () => {
   assert.equal(shortTraceId(undefined), '');
 });
 
-// ====================== serviceColor / serviceIcon ======================
-// Пункт 6.5 плана улучшений: подсветка цветом и иконками для сервисов.
-
-test('SERVICE_ICON_PALETTE: непустой массив уникальных строк', () => {
-  assert.ok(Array.isArray(SERVICE_ICON_PALETTE));
-  // Палитра должна состоять из ≥10 пар «заполненный/контурный» — это
-  // даёт хорошее разнообразие даже на 15–20 сервисах (см. README,
-  // раздел «Подсветка цветом и иконками для сервисов»).
-  assert.ok(SERVICE_ICON_PALETTE.length >= 20,
-    `ожидали палитру из >=20 элементов, получили ${SERVICE_ICON_PALETTE.length}`);
-  assert.equal(SERVICE_ICON_PALETTE.length % 2, 0,
-    'размер палитры должен быть чётным — пары заполненный/контурный');
-  const set = new Set(SERVICE_ICON_PALETTE);
-  assert.equal(set.size, SERVICE_ICON_PALETTE.length,
-    'все элементы палитры должны быть уникальными');
-  for (const ic of SERVICE_ICON_PALETTE) {
-    assert.equal(typeof ic, 'string');
-    assert.ok(ic.length >= 1);
-  }
-});
-
-test('SERVICE_ICON_PALETTE: содержит заполненные и контурные варианты одних форм', () => {
-  // Спот-чек дизайна «10 форм × 2 заливки» (пункт 6.5 плана улучшений).
-  // Проверяем известные пары — если кто-то заменит палитру плоским списком
-  // без парности, этот тест явно укажет на потерю структуры.
-  const pairs = [
-    ['●', '○'],   // круг
-    ['■', '□'],   // квадрат
-    ['◆', '◇'],   // ромб
-    ['▲', '△'],   // треугольник вверх
-    ['★', '☆']    // звезда
-  ];
-  for (const [filled, hollow] of pairs) {
-    assert.ok(SERVICE_ICON_PALETTE.includes(filled),
-      `в палитре нет заполненного глифа ${filled}`);
-    assert.ok(SERVICE_ICON_PALETTE.includes(hollow),
-      `в палитре нет контурного глифа ${hollow}`);
-  }
-});
+// ====================== serviceColor ======================
+// Пункт 6.5 плана улучшений: подсветка цветом для сервисов.
 
 test('serviceColor: возвращает hsl-строку с hue в диапазоне 0..359', () => {
   for (const s of ['app', 'order-service', 'db', 'X', 'long-service-name-12']) {
@@ -275,39 +236,6 @@ test('serviceColor: пустые/нулевые значения не падаю
   for (const s of ['', null, undefined]) {
     assert.match(serviceColor(s), /^hsl\(\d+, 55%, 50%\)$/);
   }
-});
-
-test('serviceIcon: возвращает один из глифов палитры', () => {
-  for (const s of ['app', 'order', 'db', 'X', 'long-service-name']) {
-    const ic = serviceIcon(s);
-    assert.ok(SERVICE_ICON_PALETTE.includes(ic),
-      `${ic} (для "${s}") не входит в SERVICE_ICON_PALETTE`);
-  }
-});
-
-test('serviceIcon: детерминирован — одно имя всегда даёт одну иконку', () => {
-  assert.equal(serviceIcon('app'), serviceIcon('app'));
-  assert.equal(serviceIcon('order-service'), serviceIcon('order-service'));
-});
-
-test('serviceIcon: пустые/нулевые значения не падают и возвращают элемент палитры', () => {
-  for (const s of ['', null, undefined]) {
-    const ic = serviceIcon(s);
-    assert.ok(SERVICE_ICON_PALETTE.includes(ic));
-  }
-});
-
-test('serviceIcon: разнообразие — на 40 разных именах покрывает большую часть палитры', () => {
-  // С палитрой из 20 иконок мат. ожидание разных глифов на 40 случайных
-  // именах ≈ 20·(1−(19/20)^40) ≈ 17.4. На синтетическом наборе свежий
-  // алгоритм даёт ~17/20. Порог >=14 безопасен (~2σ ниже среднего) и
-  // одновременно НЕДОСТИЖИМ с палитрой ≤10 (что было до пункта 6.5)
-  // — это «нижняя граница», подтверждающая, что палитра реально
-  // расширилась.
-  const seen = new Set();
-  for (let i = 0; i < 40; i++) seen.add(serviceIcon(`svc-${i}`));
-  assert.ok(seen.size >= 14,
-    `на 40 разных именах ожидали >=14 разных иконок, получили ${seen.size}`);
 });
 
 // ====================== applyFilters ======================
