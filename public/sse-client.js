@@ -768,6 +768,7 @@ function resetAllLogs() {
   state.allLogs = [];
   state.fileNames = {};
   state.serviceVisibility = {};
+  state.soloServiceFilter = null;
   state.openedFiles = [];
   state.paginatedFiles.clear();
 }

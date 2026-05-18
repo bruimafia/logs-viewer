@@ -60,7 +60,12 @@ export const state = {
   // null или пустая строка — фильтр выключен. Строка — показываем только записи
   // с e._traceId === currentTraceFilter. Устанавливается кликом по бейджу
   // трассы в любой записи, снимается крестиком в баннере или при «Очистить все».
-  currentTraceFilter: null
+  currentTraceFilter: null,
+
+  // Соло-фильтр по сервису из клика по .log-service в списке.
+  // null — выключен. Строка — только этот serviceKey виден (serviceVisibility синхронизирован).
+  // Повторный клик по тому же сервису снимает фильтр и включает все сервисы.
+  soloServiceFilter: null
 };
 
 // DOM-ссылки. Модуль грузится через <script type="module">, который

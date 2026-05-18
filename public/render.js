@@ -22,6 +22,28 @@ import { initVirtualList, setItems as vlistSetItems } from './virtual-list.js';
 
 // ====================== Чипы сервисов ======================
 
+function syncServiceChipsVisibility() {
+  if (!dom.servicesFilter) return;
+  dom.servicesFilter.querySelectorAll('.service-chip').forEach(chip => {
+    const label = chip.querySelector('.service-label');
+    const service = label ? label.textContent : '';
+    if (service) chip.classList.toggle('hidden', !state.serviceVisibility[service]);
+  });
+}
+
+/**
+ * Соло-фильтр по сервису (клик по .log-service). null — снять фильтр, все сервисы включены.
+ */
+export function setSoloServiceFilter(serviceKey) {
+  const key = (serviceKey && String(serviceKey).trim()) || null;
+  state.soloServiceFilter = key;
+  Object.keys(state.fileNames).forEach(s => {
+    state.serviceVisibility[s] = key ? s === key : true;
+  });
+  syncServiceChipsVisibility();
+  render();
+}
+
 export function buildServiceChips() {
   dom.servicesFilter.innerHTML = '';
   Object.keys(state.fileNames).sort().forEach(service => {
@@ -41,6 +63,7 @@ export function buildServiceChips() {
     chip.appendChild(labelEl);
 
     chip.addEventListener('click', () => {
+      state.soloServiceFilter = null;
       state.serviceVisibility[service] = !state.serviceVisibility[service];
       chip.classList.toggle('hidden', !state.serviceVisibility[service]);
       render();
@@ -289,6 +312,7 @@ function buildRowElement(entry, idx, search, tz) {
   // цвета текста. Иконка идёт отдельным span'ом — это упрощает CSS-таргетинг.
   const svc      = entry._serviceKey || '';
   const svcColor = serviceColor(svc);
+  const isSvcActive = state.soloServiceFilter === svc;
 
   // Полная временная метка идёт в нативный tooltip (`title`) — день недели,
   // время с миллисекундами, таймзона, ISO 8601, «N минут назад».
@@ -298,7 +322,7 @@ function buildRowElement(entry, idx, search, tz) {
   row.innerHTML = `
     <span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs, tz)}</span>
     <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
-    <span class="log-service" style="--service-color:${svcColor}" title="Сервис: ${escapeHtml(svc)}"><span class="service-label">${escapeHtml(svc)}</span></span>
+    <button type="button" class="log-service${isSvcActive ? ' active' : ''}" data-service="${escapeHtml(svc)}" style="--service-color:${svcColor}" title="${isSvcActive ? 'Снять фильтр по сервису' : 'Показать только этот сервис'}: ${escapeHtml(svc)}"><span class="service-label">${escapeHtml(svc)}</span></button>
     <span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>
     ${extraKeys.length ? `
       <div class="log-extra">
@@ -359,7 +383,9 @@ export function addLinesToLogs(lines, displayName, serverHost) {
     }
   }
   Object.keys(state.fileNames).forEach(s => {
-    if (state.serviceVisibility[s] === undefined) state.serviceVisibility[s] = true;
+    if (state.serviceVisibility[s] === undefined) {
+      state.serviceVisibility[s] = state.soloServiceFilter ? s === state.soloServiceFilter : true;
+    }
   });
   return added;
 }
@@ -401,8 +427,11 @@ export function render() {
   const search = dom.searchInput.value.trim();
   const list = filterLogs();
   const trace = state.currentTraceFilter;
+  const soloSvc = state.soloServiceFilter;
   if (trace) {
     dom.statsEl.textContent = `Трасса ${shortTraceId(trace)}: ${list.length} из ${state.allLogs.length}`;
+  } else if (soloSvc) {
+    dom.statsEl.textContent = `Сервис ${soloSvc}: ${list.length} из ${state.allLogs.length}`;
   } else {
     dom.statsEl.textContent = list.length === state.allLogs.length
       ? `Записей: ${state.allLogs.length}`
@@ -469,20 +498,33 @@ export function initializeVirtualList() {
   initVirtualList({ rowRenderer });
 }
 
-// Делегирование клика по бейджу traceId. Список перерисовывается часто
-// (live-режим), поэтому удобнее повесить один обработчик на контейнер.
+// Делегирование клика по бейджу traceId и по сервису в строке. Список
+// перерисовывается часто (live-режим), поэтому удобнее один обработчик на контейнер.
 export function attachTraceBadgeHandler() {
   dom.logList.addEventListener('click', (e) => {
     const badge = e.target.closest && e.target.closest('.log-trace-badge');
-    if (!badge) return;
+    if (badge) {
+      e.preventDefault();
+      e.stopPropagation();
+      const trace = badge.dataset.trace || '';
+      // Повторный клик по уже активной трассе — снимает фильтр.
+      if (state.currentTraceFilter === trace) {
+        setTraceFilter(null);
+      } else {
+        setTraceFilter(trace);
+      }
+      return;
+    }
+
+    const svcBtn = e.target.closest && e.target.closest('.log-service');
+    if (!svcBtn) return;
     e.preventDefault();
     e.stopPropagation();
-    const trace = badge.dataset.trace || '';
-    // Повторный клик по уже активной трассе — снимает фильтр.
-    if (state.currentTraceFilter === trace) {
-      setTraceFilter(null);
+    const service = svcBtn.dataset.service || '';
+    if (state.soloServiceFilter === service) {
+      setSoloServiceFilter(null);
     } else {
-      setTraceFilter(trace);
+      setSoloServiceFilter(service);
     }
   });
 

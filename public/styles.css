@@ -327,7 +327,7 @@ button { font-family: inherit; }
    чтобы клики мышью не показывали ring, а Tab-навигация — показывала. */
 :where(button, [role="button"], a, input, select, textarea, summary,
        .level-check, .quick-range-clear, .service-chip, .file-item,
-       .modal-tab, .log-trace-badge, .error-alert-toggle, .compact-mode-check,
+       .modal-tab, .log-trace-badge, .log-service, .error-alert-toggle, .compact-mode-check,
        .append-mode-check):focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
@@ -1934,7 +1934,20 @@ mark.search-match {
      же box-sizing: border-box и height: 20px, поэтому 1px border входит
      в общую высоту и pill остаётся одинаковым с .log-level. */
   padding: 0 var(--space-2);
-  cursor: default;
+  font: inherit;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), transform var(--duration-instant) var(--ease-out);
+}
+.log-service:hover {
+  background: color-mix(in srgb, var(--service-color, var(--color-border-default)) 28%, var(--color-surface-1));
+  border-color: color-mix(in srgb, var(--service-color, var(--color-border-default)) 45%, transparent);
+}
+.log-service:active { transform: translateY(1px); }
+.log-service.active {
+  background: var(--service-color, var(--color-accent));
+  color: var(--color-fg-on-accent);
+  border-color: var(--service-color, var(--color-accent));
 }
 
 @supports not (background: color-mix(in srgb, red 50%, transparent)) {

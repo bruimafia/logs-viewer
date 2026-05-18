@@ -46,6 +46,7 @@ async function loadFiles(files) {
     // При полной перезагрузке снимаем активный фильтр по трассе —
     // он почти наверняка относится к старому набору данных.
     state.currentTraceFilter = null;
+    state.soloServiceFilter = null;
   }
 
   // Для файлов, открытых из браузера, мы не знаем «настоящий» хост сервиса —
@@ -76,7 +77,9 @@ async function loadFiles(files) {
   }
   state.allLogs.sort((a, b) => a._timeMs - b._timeMs);
   Object.keys(state.fileNames).forEach(s => {
-    if (state.serviceVisibility[s] === undefined) state.serviceVisibility[s] = true;
+    if (state.serviceVisibility[s] === undefined) {
+      state.serviceVisibility[s] = state.soloServiceFilter ? s === state.soloServiceFilter : true;
+    }
   });
   updateUI();
 }
@@ -104,6 +107,7 @@ function clearAll() {
   state.openedFiles = [];
   state.paginatedFiles.clear();
   state.currentTraceFilter = null;
+  state.soloServiceFilter = null;
   updateUI();
 }
 
