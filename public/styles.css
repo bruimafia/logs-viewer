@@ -1683,6 +1683,44 @@ mark.search-match {
   .log-trace-badge:hover { background: var(--color-accent-soft-hover); }
 }
 
+/* Иконка Jaeger в баннере фильтра по трассе (справа от traceFilterValue). */
+.trace-filter-jaeger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 26px;
+  width: 26px;
+  border-radius: var(--radius-xs);
+  color: var(--color-fg-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-instant) var(--ease-out);
+}
+.trace-filter-jaeger:hover {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
+}
+.trace-filter-jaeger:active { transform: translateY(1px); }
+.trace-filter-jaeger:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.trace-filter-jaeger img {
+  display: block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.trace-filter-jaeger[hidden] {
+  display: none !important;
+}
+
 .trace-filter-banner {
   display: flex;
   align-items: center;

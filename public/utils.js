@@ -254,6 +254,30 @@ export function shortTraceId(traceId) {
 }
 
 /**
+ * Подставляет {ip} и {traceId} в шаблон URL Jaeger.
+ * Возвращает '' если каких-то данных не хватает — вызывающий код
+ * должен это проверять и не рендерить иконку.
+ *
+ * Шаблон передаётся параметром, чтобы функция оставалась чистой
+ * (без зависимости от состояния/конфигурации). По умолчанию модуль
+ * `render.js` подставляет константу JAEGER_URL_TEMPLATE из `state.js`.
+ *
+ * @param {string} template — шаблон с плейсхолдерами {ip} и {traceId}
+ * @param {?string} ip      — IP/хост сервера
+ * @param {?string} traceId — идентификатор трассы
+ * @returns {string}
+ */
+export function buildJaegerUrl(template, ip, traceId) {
+  if (!template || !traceId) return '';
+  const safeIp = String(ip || '').trim();
+  const safeTrace = String(traceId).trim();
+  if (!safeIp || !safeTrace) return '';
+  return String(template)
+    .replace(/\{ip\}/g, encodeURIComponent(safeIp))
+    .replace(/\{traceId\}/g, encodeURIComponent(safeTrace));
+}
+
+/**
  * Возвращает стабильный CSS-цвет (HSL) по имени сервиса.
  *
  * От `traceIdColor` отличается параметрами насыщенности/яркости: цвет

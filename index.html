@@ -265,6 +265,12 @@
     <div class="trace-filter-banner" id="traceFilterBanner" style="display: none;" role="status">
       <span class="trace-filter-label">Фильтр по трассе:</span>
       <code class="trace-filter-value" id="traceFilterValue"></code>
+      <a class="trace-filter-jaeger" id="traceFilterJaegerLink" target="_blank"
+         rel="noopener noreferrer" hidden aria-hidden="true"
+         aria-label="Открыть трассу в Jaeger UI в новой вкладке">
+        <img src="/public/jaeger.svg" alt="" width="22" height="22"
+             aria-hidden="true" decoding="async" draggable="false">
+      </a>
       <button type="button" class="trace-filter-clear" id="traceFilterClear"
               title="Снять фильтр" aria-label="Снять фильтр по трассе">×</button>
     </div>

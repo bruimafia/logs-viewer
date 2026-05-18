@@ -48,6 +48,11 @@ async function loadFiles(files) {
     state.currentTraceFilter = null;
   }
 
+  // Для файлов, открытых из браузера, мы не знаем «настоящий» хост сервиса —
+  // используем хост текущей страницы. Это разумный fallback: чаще всего Jaeger
+  // развёрнут рядом с просмотрщиком логов. Поле _serverHost потом используется
+  // для построения ссылки на трассу в Jaeger UI.
+  const localHost = (window.location && window.location.hostname) || '';
   for (const file of files) {
     if (isAppendMode && state.openedFiles.includes(file.name)) {
       console.log(`Файл "${file.name}" уже открыт, пропускаем`);
@@ -61,6 +66,7 @@ async function loadFiles(files) {
       const entry = parseLogLine(line, name);
       if (entry) {
         entry._fileName = file.name;
+        entry._serverHost = localHost;
         state.allLogs.push(entry);
         const s = entry._serviceKey;
         if (!state.fileNames[s]) state.fileNames[s] = new Set();

@@ -194,7 +194,7 @@ export async function loadTailMode(filesToLoad) {
       });
 
       if (!state.openedFiles.includes(displayName)) state.openedFiles.push(displayName);
-      const added = addLinesToLogs(collectedLines, displayName);
+      const added = addLinesToLogs(collectedLines, displayName, fileInfo.server?.host);
 
       state.paginatedFiles.set(key, {
         serverId: fileInfo.serverId,
@@ -256,7 +256,7 @@ export async function loadMorePages() {
         error: (data) => { throw new Error(data.message); },
         complete: () => {}
       });
-      const added = addLinesToLogs(collectedLines, pf.displayName);
+      const added = addLinesToLogs(collectedLines, pf.displayName, pf.server?.host);
       pf.currentOffset += pf.pageSize;
       pf.totalLoaded += added;
       totalAdded += added;
@@ -356,7 +356,7 @@ export async function loadRangeMode(filesToLoad) {
       });
 
       if (!state.openedFiles.includes(displayName)) state.openedFiles.push(displayName);
-      addLinesToLogs(collectedLines, displayName);
+      addLinesToLogs(collectedLines, displayName, fileInfo.server?.host);
       successCount++;
     } catch (err) {
       console.error(`Ошибка загрузки ${displayName}:`, err);
@@ -568,6 +568,9 @@ export async function startLiveMode(filesToLoad) {
 
 async function runLiveGroup(server, files, initialLines, group) {
   const serverId = server.id;
+  // host пробрасываем в каждую запись через addLinesToLogs — он нужен для
+  // ссылки в Jaeger UI (см. buildJaegerUrl + JAEGER_URL_TEMPLATE).
+  const serverHost = server.host || '';
   // fileState ключуется по f.key (virtualKey) — это уникальный идентификатор
   // потока в группе. Один fileId может породить несколько потоков (glob),
   // поэтому ключевание по чистому fileId недостаточно.
@@ -625,12 +628,16 @@ async function runLiveGroup(server, files, initialLines, group) {
         // SSE-соединение и tail -F на сервере остаются живыми;
         // строки попадут в общий список через resumeLiveStreams().
         if (state.liveStreamPaused) {
-          state.livePausedBuffer.push({ lines: data.lines, displayName: st.displayName });
+          state.livePausedBuffer.push({
+            lines: data.lines,
+            displayName: st.displayName,
+            serverHost
+          });
           updateLiveIndicator(); // обновить счётчик «+N» на кнопке
           return;
         }
 
-        const newEntries = addLinesToLogs(data.lines, st.displayName);
+        const newEntries = addLinesToLogs(data.lines, st.displayName, serverHost);
         if (newEntries.length > 0) {
           trimAllLogsIfNeeded();
           scheduleRender();
@@ -799,7 +806,7 @@ function applyPausedBuffer() {
   if (state.livePausedBuffer.length === 0) return;
   let totalAdded = 0;
   for (const item of state.livePausedBuffer) {
-    totalAdded += addLinesToLogs(item.lines, item.displayName).length;
+    totalAdded += addLinesToLogs(item.lines, item.displayName, item.serverHost).length;
   }
   state.livePausedBuffer = [];
   if (totalAdded > 0) {

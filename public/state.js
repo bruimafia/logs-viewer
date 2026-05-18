@@ -11,6 +11,15 @@ export const VIRTUAL_BUFFER_ROWS = 30;       // Буфер строк сверх
 export const ROW_HEIGHT_ESTIMATE_DEFAULT = 32;  // Оценка высоты строки в обычном режиме (px)
 export const ROW_HEIGHT_ESTIMATE_COMPACT = 22;  // Оценка высоты строки в компактном режиме (px)
 
+// Шаблон URL Jaeger UI для перехода к конкретной трассе.
+// Плейсхолдеры:
+//   {ip}      — IP/хост сервера, на котором живёт сервис (берётся из remote-config:
+//               server.host; если хост неизвестен — fallback на window.location.hostname).
+//   {traceId} — идентификатор трассы (e._traceId).
+// Если Jaeger развёрнут на другом порту/пути — поменяйте этот шаблон,
+// никаких других правок в коде не потребуется.
+export const JAEGER_URL_TEMPLATE = 'http://{ip}:16686/trace/{traceId}';
+
 export const state = {
   allLogs: [],
   fileNames: {},                // serviceKey → Set<fileName>
@@ -101,6 +110,7 @@ export const dom = {
   // Баннер активного фильтра по traceId
   traceFilterBanner: document.getElementById('traceFilterBanner'),
   traceFilterValue: document.getElementById('traceFilterValue'),
+  traceFilterJaegerLink: document.getElementById('traceFilterJaegerLink'),
   traceFilterClear: document.getElementById('traceFilterClear'),
 
   // Мини-спарклайн со статистикой. См. public/sparkline.js.

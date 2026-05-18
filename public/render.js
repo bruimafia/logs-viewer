@@ -1,7 +1,7 @@
 // Отрисовка списка логов, чипов сервисов, индикаторов и общий update UI.
 // Зависит от state (state.allLogs, state.fileNames, …) и DOM (dom.*).
 
-import { state, dom, LIVE_BUFFER_CAP, LIVE_RENDER_DEBOUNCE_MS } from './state.js';
+import { state, dom, LIVE_BUFFER_CAP, LIVE_RENDER_DEBOUNCE_MS, JAEGER_URL_TEMPLATE } from './state.js';
 import {
   escapeHtml,
   highlightMatch,
@@ -13,7 +13,8 @@ import {
   sortLogs,
   traceIdColor,
   shortTraceId,
-  serviceColor
+  serviceColor,
+  buildJaegerUrl
 } from './utils.js';
 import { renderSparkline } from './sparkline.js';
 import { getTzOffsetMinutes } from './tz-selector.js';
@@ -104,7 +105,7 @@ export function updateLiveIndicator() {
       (state.liveStreamPaused || state.livePausedBuffer.length > 0)) {
     let totalAdded = 0;
     for (const item of state.livePausedBuffer) {
-      totalAdded += addLinesToLogs(item.lines, item.displayName).length;
+      totalAdded += addLinesToLogs(item.lines, item.displayName, item.serverHost).length;
     }
     state.livePausedBuffer = [];
     state.liveStreamPaused = false;
@@ -174,6 +175,7 @@ export function setTraceFilter(traceId) {
 
 function updateTraceFilterBanner() {
   const tf = state.currentTraceFilter;
+  const jaegerEl = dom.traceFilterJaegerLink;
   if (!dom.traceFilterBanner) return;
   if (tf) {
     dom.traceFilterBanner.style.display = '';
@@ -182,8 +184,39 @@ function updateTraceFilterBanner() {
       dom.traceFilterValue.style.color = traceIdColor(tf);
       dom.traceFilterValue.title = tf;
     }
+
+    // IP сервера для Jaeger — берём из первой записи с этим traceId в загруженных логах.
+    let serverHost = '';
+    for (const e of state.allLogs) {
+      if (e._traceId === tf && e._serverHost) {
+        serverHost = String(e._serverHost).trim();
+        break;
+      }
+    }
+    if (!serverHost && typeof window !== 'undefined' && window.location?.hostname) {
+      serverHost = window.location.hostname;
+    }
+
+    const jaegerUrl = buildJaegerUrl(JAEGER_URL_TEMPLATE, serverHost, tf);
+    if (jaegerEl) {
+      if (jaegerUrl) {
+        jaegerEl.href = jaegerUrl;
+        jaegerEl.title = `Открыть трассу в Jaeger UI: ${jaegerUrl}`;
+        jaegerEl.removeAttribute('hidden');
+        jaegerEl.setAttribute('aria-hidden', 'false');
+      } else {
+        jaegerEl.removeAttribute('href');
+        jaegerEl.setAttribute('hidden', '');
+        jaegerEl.setAttribute('aria-hidden', 'true');
+      }
+    }
   } else {
     dom.traceFilterBanner.style.display = 'none';
+    if (jaegerEl) {
+      jaegerEl.removeAttribute('href');
+      jaegerEl.setAttribute('hidden', '');
+      jaegerEl.setAttribute('aria-hidden', 'true');
+    }
   }
 }
 
@@ -228,6 +261,7 @@ function buildRowElement(entry, idx, search, tz) {
   delete extra._serviceKey;
   delete extra._fileName;
   delete extra._traceId;
+  delete extra._serverHost;
   delete extra.time;
   delete extra.level;
   delete extra.msg;
@@ -291,19 +325,32 @@ function rowRenderer(entry, idx) {
 /**
  * Парсит строки и добавляет их в state.allLogs.
  *
+ * @param {string[]} lines        — исходные строки лога (JSONL)
+ * @param {string}   displayName  — человекочитаемое имя источника
+ * @param {?string}  serverHost   — IP/хост сервера, с которого пришёл лог.
+ *   Сохраняется в entry._serverHost — используется для ссылки Jaeger в баннере
+ *   фильтра по трассе (см. JAEGER_URL_TEMPLATE в state.js). Если хост неизвестен (локальные файлы
+ *   из браузера, удалённый сервер без host) — используем window.location.hostname
+ *   как разумный fallback (типичный случай — Jaeger развёрнут на той же машине,
+ *   что и просмотрщик логов).
+ *
  * @returns {Array} массив добавленных записей (если ничего не добавилось — пустой).
  *   Раньше возвращалось число; перешли на массив, чтобы вызывающая сторона
  *   (sse-client.js → error-alerts.js) могла отфильтровать ERROR без повторного
  *   парсинга. Все существующие проверки `if (added > 0)` остаются валидными,
  *   если поменять имя переменной — `if (newEntries.length > 0)`.
  */
-export function addLinesToLogs(lines, displayName) {
+export function addLinesToLogs(lines, displayName, serverHost) {
   const name = displayName.replace(/\.(log|json)$/i, '');
+  const host = (serverHost && String(serverHost).trim())
+    || (typeof window !== 'undefined' && window.location && window.location.hostname)
+    || '';
   const added = [];
   for (const line of lines) {
     const entry = parseLogLine(line, name);
     if (entry) {
       entry._fileName = displayName;
+      entry._serverHost = host;
       state.allLogs.push(entry);
       const s = entry._serviceKey;
       if (!state.fileNames[s]) state.fileNames[s] = new Set();
