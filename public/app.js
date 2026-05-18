@@ -12,6 +12,7 @@ import {
   updateUI,
   attachScrollHandler,
   attachTraceBadgeHandler,
+  initializeVirtualList,
   setTraceFilter
 } from './render.js';
 import {
@@ -29,6 +30,7 @@ import {
 import { attachErrorAlertHandlers } from './error-alerts.js';
 import { attachSparklineHandlers } from './sparkline.js';
 import { attachTzSelectorHandlers } from './tz-selector.js';
+import { invalidateHeights } from './virtual-list.js';
 
 // ====================== Загрузка локальных файлов ======================
 
@@ -186,6 +188,8 @@ document.addEventListener('click', (e) => {
 });
 
 attachScrollHandler();
+// Инициализируем виртуальный список (один раз при старте)
+initializeVirtualList();
 // Делегирование клика по бейджам traceId + клик по «✕» в баннере фильтра.
 attachTraceBadgeHandler();
 attachErrorAlertHandlers();
@@ -240,6 +244,9 @@ function applyCompactMode(on) {
       ? 'Выключить компактный режим (вернуть обычные строки)'
       : 'Уменьшить высоту строк, шрифт до 11 px, столбец сервиса — только иконка';
   }
+
+  // Сбрасываем кэш высот при переключении компактного режима
+  invalidateHeights();
 }
  
 if (dom.compactModeCheckbox) {

@@ -17,6 +17,7 @@ import {
 } from './utils.js';
 import { renderSparkline } from './sparkline.js';
 import { getTzOffsetMinutes } from './tz-selector.js';
+import { initVirtualList, setItems as vlistSetItems } from './virtual-list.js';
 
 // ====================== Чипы сервисов ======================
 
@@ -204,6 +205,87 @@ export function trimAllLogsIfNeeded() {
   state.allLogs.splice(0, state.allLogs.length - LIVE_BUFFER_CAP);
 }
 
+// ====================== Построение строки (для виртуального списка) ======================
+
+/**
+ * Строит DOM-элемент строки лога.
+ * Чистая функция — всегда возвращает новый элемент на основе данных.
+ *
+ * @param {Object} entry - запись лога
+ * @param {number} idx - индекс в отфильтрованном списке (не используется здесь, но может быть полезен)
+ * @param {string} search - поисковая строка для подсветки
+ * @param {number} tz - смещение часового пояса в минутах
+ * @returns {HTMLElement}
+ */
+function buildRowElement(entry, idx, search, tz) {
+  const row = document.createElement('div');
+  row.className = `log-entry level-${(entry.level || 'INFO').toUpperCase()}`;
+  if (entry._traceId) row.dataset.trace = entry._traceId;
+
+  const extra = { ...entry };
+  delete extra._timeMs;
+  delete extra._sourceName;
+  delete extra._serviceKey;
+  delete extra._fileName;
+  delete extra._traceId;
+  delete extra.time;
+  delete extra.level;
+  delete extra.msg;
+  delete extra.service;
+  delete extra.source;
+  const extraKeys = Object.keys(extra).filter(k => extra[k] !== undefined && extra[k] !== '');
+
+  // Бейдж traceId: кликабельный, окрашен стабильным цветом по хэшу.
+  // Если уже идёт фильтрация по этой же трассе — у бейджа класс .active.
+  let traceBadgeHtml = '';
+  if (entry._traceId) {
+    const tid = entry._traceId;
+    const color = traceIdColor(tid);
+    const short = shortTraceId(tid);
+    const isActive = state.currentTraceFilter === tid;
+    traceBadgeHtml = `<button type="button" class="log-trace-badge${isActive ? ' active' : ''}" ` +
+      `data-trace="${escapeHtml(tid)}" ` +
+      `style="--trace-color:${color}" ` +
+      `title="${isActive ? 'Снять фильтр по трассе' : 'Показать только эту трассу'}: ${escapeHtml(tid)}">` +
+      `${escapeHtml(short)}</button> `;
+  }
+
+  // Цвет и иконка сервиса. Переменная
+  // --service-color используется правилами styles.css для фона/границы/
+  // цвета текста. Иконка идёт отдельным span'ом — это упрощает CSS-таргетинг.
+  const svc      = entry._serviceKey || '';
+  const svcColor = serviceColor(svc);
+
+  // Полная временная метка идёт в нативный tooltip (`title`) — день недели,
+  // время с миллисекундами, таймзона, ISO 8601, «N минут назад».
+  // formatTimeFull возвращает '' для нулевого/невалидного времени —
+  // тогда атрибут попадёт пустым, и браузер подсказку не покажет.
+  const timeFullTitle = formatTimeFull(entry._timeMs, undefined, tz);
+  row.innerHTML = `
+    <span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs, tz)}</span>
+    <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
+    <span class="log-service" style="--service-color:${svcColor}" title="Сервис: ${escapeHtml(svc)}"><span class="service-label">${escapeHtml(svc)}</span></span>
+    <span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>
+    ${extraKeys.length ? `
+      <div class="log-extra">
+        <details>
+          <summary>Доп. поля (${extraKeys.length})</summary>
+          <pre>${highlightJson(JSON.stringify(extra, null, 2), search)}</pre>
+        </details>
+      </div>
+    ` : ''}
+  `;
+  return row;
+}
+
+// Контекст для rowRenderer (search и tz меняются при каждом вызове render)
+let currentSearchCtx = '';
+let currentTzCtx = 0;
+
+function rowRenderer(entry, idx) {
+  return buildRowElement(entry, idx, currentSearchCtx, currentTzCtx);
+}
+
 // ====================== Добавление контента ======================
 
 /**
@@ -283,13 +365,13 @@ export function render() {
   if (!state.allLogs.length) {
     dom.emptyState.style.display = 'block';
     dom.noResultsState.style.display = 'none';
-    dom.logList.querySelectorAll('.log-entry').forEach(n => n.remove());
+    vlistSetItems([]);
     return;
   }
   dom.emptyState.style.display = 'none';
   dom.noResultsState.style.display = list.length ? 'none' : 'block';
   if (!list.length) {
-    dom.logList.querySelectorAll('.log-entry').forEach(n => n.remove());
+    vlistSetItems([]);
     return;
   }
 
@@ -297,71 +379,12 @@ export function render() {
   const wasNearBottom = isNearBottom();
   const wasNearTop = isNearTop();
 
-  const fragment = document.createDocumentFragment();
-  const tz = getTzOffsetMinutes();
-  list.forEach(entry => {
-    const row = document.createElement('div');
-    row.className = `log-entry level-${(entry.level || 'INFO').toUpperCase()}`;
-    if (entry._traceId) row.dataset.trace = entry._traceId;
+  // Обновляем контекст для rowRenderer
+  currentSearchCtx = search;
+  currentTzCtx = getTzOffsetMinutes();
 
-    const extra = { ...entry };
-    delete extra._timeMs;
-    delete extra._sourceName;
-    delete extra._serviceKey;
-    delete extra._fileName;
-    delete extra._traceId;
-    delete extra.time;
-    delete extra.level;
-    delete extra.msg;
-    delete extra.service;
-    delete extra.source;
-    const extraKeys = Object.keys(extra).filter(k => extra[k] !== undefined && extra[k] !== '');
-
-    // Бейдж traceId: кликабельный, окрашен стабильным цветом по хэшу.
-    // Если уже идёт фильтрация по этой же трассе — у бейджа класс .active.
-    let traceBadgeHtml = '';
-    if (entry._traceId) {
-      const tid = entry._traceId;
-      const color = traceIdColor(tid);
-      const short = shortTraceId(tid);
-      const isActive = state.currentTraceFilter === tid;
-      traceBadgeHtml = `<button type="button" class="log-trace-badge${isActive ? ' active' : ''}" ` +
-        `data-trace="${escapeHtml(tid)}" ` +
-        `style="--trace-color:${color}" ` +
-        `title="${isActive ? 'Снять фильтр по трассе' : 'Показать только эту трассу'}: ${escapeHtml(tid)}">` +
-        `${escapeHtml(short)}</button> `;
-    }
-
-    // Цвет и иконка сервиса. Переменная
-    // --service-color используется правилами styles.css для фона/границы/
-    // цвета текста. Иконка идёт отдельным span'ом — это упрощает CSS-таргетинг.
-    const svc      = entry._serviceKey || '';
-    const svcColor = serviceColor(svc);
-
-    // Полная временная метка идёт в нативный tooltip (`title`) — день недели,
-    // время с миллисекундами, таймзона, ISO 8601, «N минут назад».
-    // formatTimeFull возвращает '' для нулевого/невалидного времени —
-    // тогда атрибут попадёт пустым, и браузер подсказку не покажет.
-    const timeFullTitle = formatTimeFull(entry._timeMs, undefined, tz);
-    row.innerHTML = `
-      <span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs, tz)}</span>
-      <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
-      <span class="log-service" style="--service-color:${svcColor}" title="Сервис: ${escapeHtml(svc)}"><span class="service-label">${escapeHtml(svc)}</span></span>
-      <span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>
-      ${extraKeys.length ? `
-        <div class="log-extra">
-          <details>
-            <summary>Доп. поля (${extraKeys.length})</summary>
-            <pre>${highlightJson(JSON.stringify(extra, null, 2), search)}</pre>
-          </details>
-        </div>
-      ` : ''}
-    `;
-    fragment.appendChild(row);
-  });
-
-  dom.logList.querySelectorAll('.log-entry').forEach(n => n.remove());
-  dom.logList.appendChild(fragment);
+  // Передаём список в виртуальный скролл
+  vlistSetItems(list);
 
   // Авто-скролл в live-режиме
   if (state.liveStreams.size > 0 && !state.userScrolledAway) {
@@ -392,6 +415,11 @@ export function attachScrollHandler() {
     const newestAtBottom = (sort === 'time-asc' || sort === 'service' || sort === 'level' || sort === 'trace');
     state.userScrolledAway = newestAtBottom ? !isNearBottom() : !isNearTop();
   });
+}
+
+// Инициализация виртуального списка (вызывается из app.js один раз)
+export function initializeVirtualList() {
+  initVirtualList({ rowRenderer });
 }
 
 // Делегирование клика по бейджу traceId. Список перерисовывается часто

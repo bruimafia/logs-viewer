@@ -1028,7 +1028,7 @@ header {
   transition: background var(--duration-fast) var(--ease-out);
 }
 /* Zebra-stripe для ритма чтения */
-.log-entry:nth-child(even of .log-entry) { background: var(--color-row-zebra); }
+.log-entry[data-parity="even"] { background: var(--color-row-zebra); }
 .log-entry:hover { background: var(--color-row-hover); }
 
 .log-entry.level-ERROR { border-left-color: var(--color-danger); }

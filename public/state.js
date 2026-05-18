@@ -7,6 +7,9 @@
 
 export const LIVE_BUFFER_CAP = 50000;        // Максимум записей при активных live-потоках
 export const LIVE_RENDER_DEBOUNCE_MS = 200;  // Дебаунс live-рендера
+export const VIRTUAL_BUFFER_ROWS = 30;       // Буфер строк сверху/снизу видимого окна для виртуализации
+export const ROW_HEIGHT_ESTIMATE_DEFAULT = 32;  // Оценка высоты строки в обычном режиме (px)
+export const ROW_HEIGHT_ESTIMATE_COMPACT = 22;  // Оценка высоты строки в компактном режиме (px)
 
 export const state = {
   allLogs: [],
