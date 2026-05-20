@@ -1011,7 +1011,8 @@ header {
 .log-entry {
   display: grid;
   grid-template-columns: 168px 64px minmax(120px, max-content) 1fr;
-  gap: var(--space-3);
+  column-gap: var(--space-3);
+  row-gap: 7px;
   padding: 7px var(--space-3) 7px var(--space-3);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
@@ -1115,7 +1116,6 @@ mark.search-match {
 }
 .log-extra {
   grid-column: 1 / -1;
-  margin-top: var(--space-1);
   padding-top: var(--space-1);
   border-top: 1px dashed var(--color-divider);
   font-size: var(--font-size-xs);
