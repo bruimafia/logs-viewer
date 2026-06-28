@@ -270,6 +270,30 @@ function updateStats(bins) {
 
 // ===================== Главный публичный API =====================
 
+/** @returns {number} Длина окна «Активность» в миллисекундах */
+export function getSparklineWindowMs() {
+  return lastWindowMs;
+}
+
+/**
+ * Границы текущего окна «Активность» для фильтрации списка логов.
+ * В live-режиме правый край — Date.now(), иначе — время самой свежей записи.
+ *
+ * @returns {{ fromMs: number, toMs: number }}
+ */
+export function getSparklineTimeBounds() {
+  const windowMs = lastWindowMs;
+  let endMs;
+  if (state.liveStreams.size > 0) {
+    endMs = Date.now();
+  } else {
+    let maxT = 0;
+    for (const e of state.allLogs) if (e._timeMs > maxT) maxT = e._timeMs;
+    endMs = maxT || Date.now();
+  }
+  return { fromMs: endMs - windowMs, toMs: endMs };
+}
+
 /**
  * Запрашивает перерисовку спарклайна через requestAnimationFrame.
  * Безопасно вызывать многократно — реальная отрисовка максимум один раз за кадр.
@@ -299,18 +323,8 @@ function paintNow() {
   const collapsed = localStorage.getItem(LS_KEY_COLLAPSED) === '1';
   dom.sparklineWrap.classList.toggle('collapsed', collapsed);
 
-  // В live-режиме окно «едет» вправо по текущему времени,
-  // иначе привязано к времени самой свежей записи
+  const { fromMs: startMs, toMs: endMs } = getSparklineTimeBounds();
   const windowMs = lastWindowMs;
-  let endMs;
-  if (state.liveStreams.size > 0) {
-    endMs = Date.now();
-  } else {
-    let maxT = 0;
-    for (const e of state.allLogs) if (e._timeMs > maxT) maxT = e._timeMs;
-    endMs = maxT || Date.now();
-  }
-  const startMs = endMs - windowMs;
 
   // Биннинг нужен даже в свёрнутом состоянии для отображения итоговых цифр
   const { bins, max } = binByLevel(state.allLogs, windowMs, endMs);
@@ -427,8 +441,11 @@ function zoomToBin(bin) {
 /**
  * Инициализирует обработчики событий для спарклайна.
  * Должна вызываться один раз из app.js после загрузки DOM.
+ *
+ * @param {{ onFiltersChange?: () => void }} [options]
+ *   onFiltersChange — перерисовать список логов при смене окна или live-тике
  */
-export function attachSparklineHandlers() {
+export function attachSparklineHandlers({ onFiltersChange } = {}) {
   // Восстановление выбора окна из localStorage
   try {
     const saved = parseInt(localStorage.getItem(LS_KEY_WINDOW) || '', 10);
@@ -446,6 +463,7 @@ export function attachSparklineHandlers() {
         lastWindowMs = ms;
         try { localStorage.setItem(LS_KEY_WINDOW, String(ms)); } catch (e) {}
         renderSparkline();
+        if (onFiltersChange) onFiltersChange();
       }
     });
   }
@@ -493,6 +511,7 @@ export function attachSparklineHandlers() {
   setInterval(() => {
     if (state.liveStreams.size > 0 && !state.liveStreamPaused) {
       renderSparkline();
+      if (onFiltersChange) onFiltersChange();
     }
   }, LIVE_TICK_MS);
 

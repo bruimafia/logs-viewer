@@ -30,6 +30,22 @@ function getHeight(entry) {
   return heights.get(entry) ?? estimateRowHeight();
 }
 
+/** Пересчитывает top/bottom спейсеры по текущему окну и кэшу высот. */
+function updateSpacerHeights(rangeStart, rangeEnd) {
+  let topOffset = 0;
+  for (let i = 0; i < rangeStart; i++) {
+    topOffset += getHeight(items[i]);
+  }
+
+  let bottomOffset = 0;
+  for (let i = rangeEnd + 1; i < items.length; i++) {
+    bottomOffset += getHeight(items[i]);
+  }
+
+  topSpacer.style.height = `${topOffset}px`;
+  bottomSpacer.style.height = `${bottomOffset}px`;
+}
+
 // ====================== Публичный API ======================
 
 /**
@@ -87,17 +103,9 @@ export function initVirtualList(config) {
 
     // Ждём следующий кадр, чтобы details успел отрисоваться с новой высотой
     requestAnimationFrame(() => {
-      const newHeight = row.offsetHeight;
-      const oldHeight = heights.get(entry) ?? estimateRowHeight();
-      heights.set(entry, newHeight);
-
-      // Корректируем спейсеры (без полной перерисовки окна)
-      const delta = newHeight - oldHeight;
-      if (delta !== 0) {
-        // Определяем, в какой спейсер уходит дельта
-        // Если строка в смонтированном окне, то дельта вычитается из bottomSpacer
-        const currentBottomHeight = parseFloat(bottomSpacer.style.height) || 0;
-        bottomSpacer.style.height = `${Math.max(0, currentBottomHeight - delta)}px`;
+      heights.set(entry, row.offsetHeight);
+      if (mountedRange.start >= 0) {
+        updateSpacerHeights(mountedRange.start, mountedRange.end);
       }
     });
   }, true);  // capture
@@ -184,19 +192,7 @@ export function renderWindow() {
 
   mountedRange = { start: bufferStart, end: bufferEnd };
 
-  // Считаем высоты спейсеров
-  let topOffset = 0;
-  for (let i = 0; i < bufferStart; i++) {
-    topOffset += getHeight(items[i]);
-  }
-
-  let bottomOffset = 0;
-  for (let i = bufferEnd + 1; i < items.length; i++) {
-    bottomOffset += getHeight(items[i]);
-  }
-
-  topSpacer.style.height = `${topOffset}px`;
-  bottomSpacer.style.height = `${bottomOffset}px`;
+  updateSpacerHeights(bufferStart, bufferEnd);
 
   // Удаляем все строки между спейсерами
   while (topSpacer.nextSibling && topSpacer.nextSibling !== bottomSpacer) {
@@ -227,26 +223,18 @@ export function renderWindow() {
 
   // Измеряем высоты после рендера (в следующем кадре, чтобы layout завершился)
   requestAnimationFrame(() => {
-    let spacerDelta = 0;
     const rows = dom.logList.querySelectorAll('.log-entry');
 
     rows.forEach((row) => {
       const idx = parseInt(row.dataset.idx, 10);
       if (isNaN(idx) || idx < 0 || idx >= items.length) return;
 
-      const entry = items[idx];
-      const measuredHeight = row.offsetHeight;
-      const estimatedHeight = getHeight(entry);
-
-      heights.set(entry, measuredHeight);
-      spacerDelta += (measuredHeight - estimatedHeight);
+      heights.set(items[idx], row.offsetHeight);
     });
 
-    // Корректируем спейсеры, если высоты уточнились
-    if (spacerDelta !== 0) {
-      const currentBottom = parseFloat(bottomSpacer.style.height) || 0;
-      bottomSpacer.style.height = `${Math.max(0, currentBottom - spacerDelta)}px`;
-    }
+    // Пересчитываем спейсеры по измеренным высотам — нельзя «компенсировать»
+    // только bottomSpacer: это давало фантомное пустое место внизу списка.
+    updateSpacerHeights(bufferStart, bufferEnd);
   });
 }
 
@@ -257,6 +245,52 @@ export function renderWindow() {
 export function invalidateHeights() {
   heights = new WeakMap();
   renderWindow();
+}
+
+/**
+ * Возвращает запись у верхней границы viewport и смещение внутри строки.
+ * @returns {{ entry: object, offsetInRow: number } | null}
+ */
+export function getScrollAnchor() {
+  if (items.length === 0) return null;
+
+  const scrollTop = dom.logListWrap.scrollTop;
+  let accumulatedHeight = 0;
+
+  for (let i = 0; i < items.length; i++) {
+    const h = getHeight(items[i]);
+    if (accumulatedHeight + h > scrollTop) {
+      return { entry: items[i], offsetInRow: scrollTop - accumulatedHeight };
+    }
+    accumulatedHeight += h;
+  }
+
+  const last = items[items.length - 1];
+  return { entry: last, offsetInRow: 0 };
+}
+
+/**
+ * Прокручивает список так, чтобы anchor.entry снова оказалась на прежнем месте.
+ * @param {{ entry: object, offsetInRow: number } | null} anchor
+ * @param {Array} targetItems — целевой массив записей (обычно полный отфильтрованный список)
+ */
+export function scrollToAnchor(anchor, targetItems) {
+  if (!anchor?.entry || !targetItems?.length) return;
+
+  const idx = targetItems.indexOf(anchor.entry);
+  if (idx < 0) return;
+
+  const apply = () => {
+    let topOffset = 0;
+    for (let i = 0; i < idx; i++) {
+      topOffset += getHeight(targetItems[i]);
+    }
+    dom.logListWrap.scrollTop = topOffset + (anchor.offsetInRow || 0);
+    renderWindow();
+  };
+
+  apply();
+  requestAnimationFrame(apply);
 }
 
 /**

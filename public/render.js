@@ -16,9 +16,14 @@ import {
   serviceColor,
   buildJaegerUrl
 } from './utils.js';
-import { renderSparkline } from './sparkline.js';
+import { renderSparkline, getSparklineTimeBounds } from './sparkline.js';
 import { getTzOffsetMinutes } from './tz-selector.js';
-import { initVirtualList, setItems as vlistSetItems } from './virtual-list.js';
+import {
+  initVirtualList,
+  setItems as vlistSetItems,
+  getScrollAnchor,
+  scrollToAnchor
+} from './virtual-list.js';
 
 // ====================== Чипы сервисов ======================
 
@@ -31,6 +36,42 @@ function syncServiceChipsVisibility() {
   });
 }
 
+function areAllServicesVisible() {
+  const services = Object.keys(state.fileNames);
+  if (!services.length) return true;
+  return services.every(s => state.serviceVisibility[s] !== false);
+}
+
+function updateServicesToggleAllButton() {
+  if (!dom.servicesToggleAllBtn) return;
+  const services = Object.keys(state.fileNames);
+  const hasServices = services.length > 0;
+  const allVisible = hasServices && areAllServicesVisible();
+  dom.servicesToggleAllBtn.disabled = !hasServices;
+  dom.servicesToggleAllBtn.classList.toggle('show-all', hasServices && !allVisible);
+  const label = allVisible ? 'Скрыть все сервисы' : 'Отобразить все сервисы';
+  dom.servicesToggleAllBtn.title = label;
+  dom.servicesToggleAllBtn.setAttribute('aria-label', label);
+}
+
+export function toggleAllServicesVisibility() {
+  const services = Object.keys(state.fileNames);
+  if (!services.length) return;
+  const showAll = !areAllServicesVisible();
+  state.soloServiceFilter = null;
+  services.forEach(s => {
+    state.serviceVisibility[s] = showAll;
+  });
+  syncServiceChipsVisibility();
+  updateServicesToggleAllButton();
+  render();
+}
+
+export function attachServicesToggleAllHandler() {
+  if (!dom.servicesToggleAllBtn) return;
+  dom.servicesToggleAllBtn.addEventListener('click', toggleAllServicesVisibility);
+}
+
 /**
  * Соло-фильтр по сервису (клик по .log-service). null — снять фильтр, все сервисы включены.
  */
@@ -41,6 +82,18 @@ export function setSoloServiceFilter(serviceKey) {
     state.serviceVisibility[s] = key ? s === key : true;
   });
   syncServiceChipsVisibility();
+  render();
+}
+
+/**
+ * Соло-фильтр по уровню (клик по .log-level). null — снять фильтр, все уровни включены.
+ */
+export function setSoloLevelFilter(levelKey) {
+  const key = (levelKey && String(levelKey).trim().toUpperCase()) || null;
+  state.soloLevelFilter = key;
+  dom.levelChecks.forEach(cb => {
+    cb.checked = key ? cb.value === key : true;
+  });
   render();
 }
 
@@ -190,10 +243,17 @@ export function updateLiveIndicator() {
  * при загрузке новых файлов).
  */
 export function setTraceFilter(traceId) {
-  // Устанавливаем фильтр только если traceId это непустая строка
-  // Пустая строка, null или undefined означают "без фильтра"
-  state.currentTraceFilter = (traceId && String(traceId).trim()) || null;
-  render();
+  const next = (traceId && String(traceId).trim()) || null;
+  const hadFilter = !!state.currentTraceFilter;
+  const willHaveFilter = !!next;
+
+  // Перед включением фильтра запоминаем, какая запись была у верхнего края viewport.
+  if (!hadFilter && willHaveFilter) {
+    state.traceFilterScrollAnchor = getScrollAnchor();
+  }
+
+  state.currentTraceFilter = next;
+  render({ restoreTraceScrollAnchor: hadFilter && !willHaveFilter });
 }
 
 function updateTraceFilterBanner() {
@@ -292,24 +352,27 @@ function buildRowElement(entry, idx, search, tz) {
   delete extra.source;
   const extraKeys = Object.keys(extra).filter(k => extra[k] !== undefined && extra[k] !== '');
 
-  // Бейдж traceId: кликабельный, окрашен стабильным цветом по хэшу.
-  // Если уже идёт фильтрация по этой же трассе — у бейджа класс .active.
-  let traceBadgeHtml = '';
+  // Бейдж traceId — отдельная колонка сетки (.log-trace), чтобы сообщения
+  // не сдвигались, когда у соседних строк traceId есть или нет.
+  let traceCellHtml = '<span class="log-trace"></span>';
   if (entry._traceId) {
     const tid = entry._traceId;
     const color = traceIdColor(tid);
     const short = shortTraceId(tid);
     const isActive = state.currentTraceFilter === tid;
-    traceBadgeHtml = `<button type="button" class="log-trace-badge${isActive ? ' active' : ''}" ` +
+    traceCellHtml = `<span class="log-trace"><button type="button" class="log-trace-badge${isActive ? ' active' : ''}" ` +
       `data-trace="${escapeHtml(tid)}" ` +
       `style="--trace-color:${color}" ` +
       `title="${isActive ? 'Снять фильтр по трассе' : 'Показать только эту трассу'}: ${escapeHtml(tid)}">` +
-      `${escapeHtml(short)}</button> `;
+      `${escapeHtml(short)}</button></span>`;
   }
 
   // Цвет и иконка сервиса. Переменная
   // --service-color используется правилами styles.css для фона/границы/
   // цвета текста. Иконка идёт отдельным span'ом — это упрощает CSS-таргетинг.
+  const lvl = (entry.level || 'INFO').toUpperCase();
+  const isLvlActive = state.soloLevelFilter === lvl;
+
   const svc      = entry._serviceKey || '';
   const svcColor = serviceColor(svc);
   const isSvcActive = state.soloServiceFilter === svc;
@@ -319,19 +382,28 @@ function buildRowElement(entry, idx, search, tz) {
   // formatTimeFull возвращает '' для нулевого/невалидного времени —
   // тогда атрибут попадёт пустым, и браузер подсказку не покажет.
   const timeFullTitle = formatTimeFull(entry._timeMs, undefined, tz);
+
+  // Пустой .log-extra-slot держит колонку доп. полей, чтобы msg не сдвигался.
+  const extraCellHtml = extraKeys.length ? `
+      <details class="log-extra">
+        <summary class="log-extra-toggle" title="Дополнительные поля (${extraKeys.length})">
+          <span class="log-extra-icon" aria-hidden="true"></span>
+          <span class="log-extra-count">${extraKeys.length}</span>
+          <span class="sr-only">Дополнительные поля</span>
+        </summary>
+        <div class="log-extra-panel">
+          <pre>${highlightJson(JSON.stringify(extra, null, 2), search)}</pre>
+        </div>
+      </details>
+    ` : '<span class="log-extra-slot"></span>';
+
   row.innerHTML = `
     <span class="log-time"${timeFullTitle ? ` title="${escapeHtml(timeFullTitle)}"` : ''}>${formatTime(entry._timeMs, tz)}</span>
-    <span class="log-level level-${(entry.level || 'INFO').toUpperCase()}">${(entry.level || 'INFO').toUpperCase()}</span>
+    <button type="button" class="log-level level-${lvl}${isLvlActive ? ' active' : ''}" data-level="${escapeHtml(lvl)}" title="${isLvlActive ? 'Снять фильтр по уровню' : 'Показать только этот уровень'}: ${escapeHtml(lvl)}">${escapeHtml(lvl)}</button>
     <button type="button" class="log-service${isSvcActive ? ' active' : ''}" data-service="${escapeHtml(svc)}" style="--service-color:${svcColor}" title="${isSvcActive ? 'Снять фильтр по сервису' : 'Показать только этот сервис'}: ${escapeHtml(svc)}"><span class="service-label">${escapeHtml(svc)}</span></button>
-    <span class="log-msg">${traceBadgeHtml}${highlightMatch(entry.msg || '', search)}</span>
-    ${extraKeys.length ? `
-      <div class="log-extra">
-        <details>
-          <summary>Доп. поля (${extraKeys.length})</summary>
-          <pre>${highlightJson(JSON.stringify(extra, null, 2), search)}</pre>
-        </details>
-      </div>
-    ` : ''}
+    ${traceCellHtml}
+    ${extraCellHtml}
+    <span class="log-msg">${highlightMatch(entry.msg || '', search)}</span>
   `;
   return row;
 }
@@ -394,11 +466,16 @@ export function addLinesToLogs(lines, displayName, serverHost) {
 
 // Считывает текущие значения фильтров с DOM и вызывает чистые функции.
 function filterLogs() {
+  const { fromMs: sparkFrom, toMs: sparkTo } = getSparklineTimeBounds();
+  const manualFrom = dom.timeFrom.value ? new Date(dom.timeFrom.value).getTime() : null;
+  const manualTo = dom.timeTo.value ? new Date(dom.timeTo.value).getTime() : null;
   const filters = {
     search: dom.searchInput.value.trim(),
-    activeLevels: dom.levelChecks.filter(cb => cb.checked).map(cb => cb.value),
-    fromMs: dom.timeFrom.value ? new Date(dom.timeFrom.value).getTime() : null,
-    toMs: dom.timeTo.value ? new Date(dom.timeTo.value).getTime() : null,
+    activeLevels: state.soloLevelFilter
+      ? [state.soloLevelFilter]
+      : dom.levelChecks.filter(cb => cb.checked).map(cb => cb.value),
+    fromMs: manualFrom != null ? Math.max(manualFrom, sparkFrom) : sparkFrom,
+    toMs: manualTo != null ? Math.min(manualTo, sparkTo) : sparkTo,
     serviceVisibility: state.serviceVisibility,
     // Передаем traceFilter как есть, без преобразования пустой строки в null
     traceFilter: state.currentTraceFilter
@@ -413,9 +490,26 @@ function isNearTop() {
   return dom.logListWrap.scrollTop < 100;
 }
 
-export function render() {
+function isNewestAtBottom() {
+  const sort = dom.sortBy.value;
+  return sort === 'time-asc' || sort === 'service' || sort === 'level' || sort === 'trace';
+}
+
+/** Прокрутка к «текущему моменту» — к новейшим записям с учётом сортировки. */
+function scrollToLatest() {
+  const toBottom = isNewestAtBottom();
+  const apply = () => {
+    dom.logListWrap.scrollTop = toBottom ? dom.logListWrap.scrollHeight : 0;
+  };
+  apply();
+  // Повтор после rAF: виртуальный список пересчитывает высоты строк асинхронно.
+  requestAnimationFrame(apply);
+}
+
+export function render(options = {}) {
   // Пересобираем чипы сервисов, если множество изменилось (важно для live-режима).
   maybeRebuildChips();
+  updateServicesToggleAllButton();
   // Обновляем баннер активной трассы.
   updateTraceFilterBanner();
   // Обновляем мини-спарклайн. Дроссель через rAF — несколько
@@ -428,10 +522,13 @@ export function render() {
   const list = filterLogs();
   const trace = state.currentTraceFilter;
   const soloSvc = state.soloServiceFilter;
+  const soloLvl = state.soloLevelFilter;
   if (trace) {
     dom.statsEl.textContent = `Трасса ${shortTraceId(trace)}: ${list.length} из ${state.allLogs.length}`;
   } else if (soloSvc) {
     dom.statsEl.textContent = `Сервис ${soloSvc}: ${list.length} из ${state.allLogs.length}`;
+  } else if (soloLvl) {
+    dom.statsEl.textContent = `Уровень ${soloLvl}: ${list.length} из ${state.allLogs.length}`;
   } else {
     dom.statsEl.textContent = list.length === state.allLogs.length
       ? `Записей: ${state.allLogs.length}`
@@ -462,13 +559,18 @@ export function render() {
   // Передаём список в виртуальный скролл
   vlistSetItems(list);
 
-  // Авто-скролл в live-режиме
-  if (state.liveStreams.size > 0 && !state.userScrolledAway) {
-    const sort = dom.sortBy.value;
-    const newestAtBottom = (sort === 'time-asc' || sort === 'service' || sort === 'level' || sort === 'trace');
-    if (newestAtBottom && wasNearBottom) {
+  // Возврат к прежней позиции после снятия trace-фильтра.
+  if (options.restoreTraceScrollAnchor && state.traceFilterScrollAnchor) {
+    scrollToAnchor(state.traceFilterScrollAnchor, list);
+    state.traceFilterScrollAnchor = null;
+  } else if (options.scrollToLatest) {
+    state.userScrolledAway = false;
+    scrollToLatest();
+  } else if (state.liveStreams.size > 0 && !state.userScrolledAway) {
+    // Авто-скролл в live-режиме
+    if (isNewestAtBottom() && wasNearBottom) {
       dom.logListWrap.scrollTop = dom.logListWrap.scrollHeight;
-    } else if (!newestAtBottom && wasNearTop) {
+    } else if (!isNewestAtBottom() && wasNearTop) {
       dom.logListWrap.scrollTop = 0;
     }
   }
@@ -512,6 +614,19 @@ export function attachTraceBadgeHandler() {
         setTraceFilter(null);
       } else {
         setTraceFilter(trace);
+      }
+      return;
+    }
+
+    const lvlBtn = e.target.closest && e.target.closest('.log-level');
+    if (lvlBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const level = lvlBtn.dataset.level || '';
+      if (state.soloLevelFilter === level) {
+        setSoloLevelFilter(null);
+      } else {
+        setSoloLevelFilter(level);
       }
       return;
     }

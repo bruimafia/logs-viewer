@@ -167,7 +167,7 @@
         <label class="level-check"><input type="checkbox" id="levelError" value="ERROR" checked> ERROR</label>
         <label class="level-check"><input type="checkbox" id="levelWarn"  value="WARN"  checked> WARN</label>
         <label class="level-check"><input type="checkbox" id="levelInfo"  value="INFO"  checked> INFO</label>
-        <label class="level-check"><input type="checkbox" id="levelDebug" value="DEBUG"> DEBUG</label>
+        <label class="level-check"><input type="checkbox" id="levelDebug" value="DEBUG" checked> DEBUG</label>
       </div>
 
       <!-- Группа фильтра временного диапазона — «С», «До» и пресет «Быстро»
@@ -224,6 +224,20 @@
 
       <div class="toolbar-services-wrap">
         <span class="services-label">Сервисы</span>
+        <button type="button" class="services-toggle-all" id="servicesToggleAllBtn"
+                disabled title="Скрыть все сервисы" aria-label="Скрыть все сервисы">
+          <svg class="services-icon-hide" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+          <svg class="services-icon-show" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
         <div class="services-filter" id="servicesFilter"></div>
       </div>
     </div>

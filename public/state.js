@@ -29,7 +29,7 @@ export const state = {
   selectedFiles: new Set(),
 
   // Режим загрузки в модалке
-  currentLoadMode: 'tail',
+  currentLoadMode: 'live',
 
   // Состояние пагинации для tail-режима:
   // key "serverId::fileId" → { serverId, fileId, displayName, currentOffset, pageSize, server, file, totalLoaded }
@@ -61,11 +61,17 @@ export const state = {
   // с e._traceId === currentTraceFilter. Устанавливается кликом по бейджу
   // трассы в любой записи, снимается крестиком в баннере или при «Очистить все».
   currentTraceFilter: null,
+  // Якорь прокрутки перед включением trace-фильтра — восстанавливается при снятии.
+  traceFilterScrollAnchor: null,
 
   // Соло-фильтр по сервису из клика по .log-service в списке.
   // null — выключен. Строка — только этот serviceKey виден (serviceVisibility синхронизирован).
   // Повторный клик по тому же сервису снимает фильтр и включает все сервисы.
-  soloServiceFilter: null
+  soloServiceFilter: null,
+
+  // Соло-фильтр по уровню из клика по .log-level в списке.
+  // null — выключен. Строка (ERROR/WARN/…) — только этот уровень; чекбоксы синхронизированы.
+  soloLevelFilter: null
 };
 
 // DOM-ссылки. Модуль грузится через <script type="module">, который
@@ -86,6 +92,7 @@ export const dom = {
   quickRangeClearBtn: document.getElementById('quickRangeClearBtn'),
   sortBy: document.getElementById('sortBy'),
   servicesFilter: document.getElementById('servicesFilter'),
+  servicesToggleAllBtn: document.getElementById('servicesToggleAllBtn'),
   appendModeCheckbox: document.getElementById('appendMode'),
   compactModeCheckbox: document.getElementById('compactMode'),
   clearAllBtn: document.getElementById('clearAllBtn'),

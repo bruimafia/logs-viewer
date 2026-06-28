@@ -149,7 +149,7 @@ function getLogLevels() {
 // ====================== Режим 1: Tail с пагинацией ======================
 
 export async function loadTailMode(filesToLoad) {
-  const linesNum = parseInt(document.getElementById('tailLines').value) || 1000;
+  const linesNum = parseInt(document.getElementById('tailLines').value) || 100;
   const grepOptions = getGrepOptions();
   const progressContainer = createProgressContainer();
   const isAppend = dom.appendModeCheckbox.checked;
@@ -499,7 +499,7 @@ export function clearAllLiveLoading() {
 // в очереди браузера и до сервера не доходили.
 
 export async function startLiveMode(filesToLoad) {
-  const initialLines = parseInt(document.getElementById('liveInitialLines').value) || 100;
+  const initialLines = parseInt(document.getElementById('liveInitialLines').value) || 30;
   const isAppend = dom.appendModeCheckbox.checked;
 
   if (!isAppend) {
@@ -769,6 +769,7 @@ function resetAllLogs() {
   state.fileNames = {};
   state.serviceVisibility = {};
   state.soloServiceFilter = null;
+  state.soloLevelFilter = null;
   state.openedFiles = [];
   state.paginatedFiles.clear();
 }

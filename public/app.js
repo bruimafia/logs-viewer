@@ -12,6 +12,7 @@ import {
   updateUI,
   attachScrollHandler,
   attachTraceBadgeHandler,
+  attachServicesToggleAllHandler,
   initializeVirtualList,
   setTraceFilter
 } from './render.js';
@@ -46,7 +47,10 @@ async function loadFiles(files) {
     // При полной перезагрузке снимаем активный фильтр по трассе —
     // он почти наверняка относится к старому набору данных.
     state.currentTraceFilter = null;
+    state.traceFilterScrollAnchor = null;
     state.soloServiceFilter = null;
+    state.soloLevelFilter = null;
+    dom.levelChecks.forEach(cb => { cb.checked = true; });
   }
 
   // Для файлов, открытых из браузера, мы не знаем «настоящий» хост сервиса —
@@ -107,7 +111,10 @@ function clearAll() {
   state.openedFiles = [];
   state.paginatedFiles.clear();
   state.currentTraceFilter = null;
+  state.traceFilterScrollAnchor = null;
   state.soloServiceFilter = null;
+  state.soloLevelFilter = null;
+  dom.levelChecks.forEach(cb => { cb.checked = true; });
   updateUI();
 }
 
@@ -118,7 +125,10 @@ dom.clearAllBtn.addEventListener('click', clearAll);
   el.addEventListener('input', render);
   el.addEventListener('change', render);
 });
-dom.levelChecks.forEach(cb => cb.addEventListener('change', render));
+dom.levelChecks.forEach(cb => cb.addEventListener('change', () => {
+  state.soloLevelFilter = null;
+  render();
+}));
 
 // Быстрые временные диапазоны: выбор пресета в выпадающем списке
 // заполняет timeFrom/timeTo относительно текущего момента и
@@ -143,7 +153,7 @@ if (dom.quickRangeClearBtn) {
     dom.timeFrom.value = '';
     dom.timeTo.value = '';
     if (dom.quickRangeSelect) dom.quickRangeSelect.value = '';
-    render();
+    render({ scrollToLatest: true });
   });
 }
 
@@ -202,8 +212,9 @@ attachScrollHandler();
 initializeVirtualList();
 // Делегирование клика по бейджам traceId + клик по «✕» в баннере фильтра.
 attachTraceBadgeHandler();
+attachServicesToggleAllHandler();
 attachErrorAlertHandlers();
-attachSparklineHandlers();
+attachSparklineHandlers({ onFiltersChange: () => render() });
 attachTzSelectorHandlers();
 
 // ====================== Переключение темы ======================

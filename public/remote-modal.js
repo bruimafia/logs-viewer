@@ -145,6 +145,7 @@ function getGlobCacheEntry(cacheKey) {
 
 export async function openRemoteModal() {
   state.selectedFiles.clear();
+  state.currentLoadMode = 'live';
   // Сбрасываем кэш glob-расширения: пути на серверах могли измениться
   // (ротация, добавление новых файлов), поэтому при каждом открытии модалки
   // перезапрашиваем актуальный список.
@@ -241,8 +242,13 @@ function renderFilesTab() {
   let html = `
     <!-- Селектор режима -->
     <div class="load-mode-selector" id="loadModeSelector">
+      <label class="load-mode-option" data-mode="live">
+        <input type="radio" name="loadMode" value="live" checked>
+        <span class="load-mode-option-icon">●</span>
+        <span>Live</span>
+      </label>
       <label class="load-mode-option" data-mode="tail">
-        <input type="radio" name="loadMode" value="tail" checked>
+        <input type="radio" name="loadMode" value="tail">
         <span class="load-mode-option-icon">⇣</span>
         <span>Хвост</span>
       </label>
@@ -251,15 +257,10 @@ function renderFilesTab() {
         <span class="load-mode-option-icon">⇋</span>
         <span>Диапазон дат</span>
       </label>
-      <label class="load-mode-option" data-mode="live">
-        <input type="radio" name="loadMode" value="live">
-        <span class="load-mode-option-icon">●</span>
-        <span>Live</span>
-      </label>
     </div>
 
     <!-- Серверный поиск — общее поле для режимов «Хвост» и «Диапазон» -->
-    <div class="mode-config mode-config-shared" id="config-shared-grep">
+    <div class="mode-config mode-config-shared" id="config-shared-grep" style="display: none;">
       <span class="mode-config-label">Содержит (опционально) — серверный grep до загрузки</span>
       <div class="mode-config-row mode-config-row-grep">
         <input type="text" id="remoteGrepPattern"
@@ -284,10 +285,10 @@ function renderFilesTab() {
     </div>
 
     <!-- Конфигурация: Хвост -->
-    <div class="mode-config" id="config-tail">
+    <div class="mode-config" id="config-tail" style="display:none;">
       <span class="mode-config-label">Загрузить N последних строк (быстро, через tail)</span>
       <div class="mode-config-row">
-        <label>Строк: <input type="number" id="tailLines" value="1000" min="10" max="100000" step="100"></label>
+        <label>Строк: <input type="number" id="tailLines" value="100" min="10" max="100000" step="100"></label>
       </div>
       <div class="mode-hint">
         После загрузки в списке появится кнопка «↑ Загрузить ещё», которая подгрузит следующую страницу той же длины с каждого выбранного файла.
@@ -318,10 +319,10 @@ function renderFilesTab() {
     </div>
 
     <!-- Конфигурация: Live -->
-    <div class="mode-config" id="config-live" style="display:none;">
+    <div class="mode-config" id="config-live">
       <span class="mode-config-label">Реальное время (tail -F): новые строки поступают мгновенно</span>
       <div class="mode-config-row">
-        <label>Начальные строки: <input type="number" id="liveInitialLines" value="100" min="0" max="10000" step="10"></label>
+        <label>Начальные строки: <input type="number" id="liveInitialLines" value="30" min="0" max="10000" step="10"></label>
       </div>
       <div class="mode-hint">
         Сначала будут показаны указанные начальные строки, затем новые записи будут появляться в реальном времени.
@@ -348,7 +349,7 @@ function renderFilesTab() {
             <button class="btn refresh-btn" onclick="event.stopPropagation(); testServerConnection('${server.id}')" title="Проверить соединение">↻</button>
           </div>
         </div>
-        <div class="server-files" id="files-${server.id}">
+        <div class="server-files" id="files-${server.id}" style="display: none;">
           ${server.files.map(file => buildFileEntryHtml(server, file)).join('')}
         </div>
       </div>

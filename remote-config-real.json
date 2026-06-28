@@ -1,0 +1,64 @@
+{
+  "servers": [
+    {
+      "id": "s1",
+      "name": "Stage",
+      "host": "192.168.185.111",
+      "port": 22,
+      "username": "user",
+      "password": "P@ssw0rd",
+      "files": [
+        {
+          "id": "file-1779088797723",
+          "name": "www",
+          "remotePath": "/var/www/services/*/*.log"
+        }
+      ]
+    },
+    {
+      "id": "server-1779711294723",
+      "name": "Production",
+      "files": [
+        {
+          "id": "file-1779714495789",
+          "name": "logs",
+          "remotePath": "/var/www/services/*/*.log"
+        }
+      ],
+      "host": "192.168.185.8",
+      "port": 22,
+      "username": "user",
+      "password": "P@ssw0rd"
+    },
+    {
+      "id": "server-1779715646629",
+      "name": "Perekop-VM-QA-Dibrivniy",
+      "files": [
+        {
+          "id": "file-1779715684637",
+          "name": "logs",
+          "remotePath": "/var/www/services/*/*.log"
+        }
+      ],
+      "host": "192.168.185.23",
+      "port": 22,
+      "username": "user",
+      "password": "P@ssw0rd"
+    },
+    {
+      "id": "server-1780567936844",
+      "name": "Perekop-VM-QA-Panteleev",
+      "files": [
+        {
+          "id": "file-1780567962556",
+          "name": "logs",
+          "remotePath": "/var/www/services/*/*.log"
+        }
+      ],
+      "host": "192.168.185.74",
+      "port": 22,
+      "username": "user",
+      "password": "P@ssw0rd"
+    }
+  ]
+}
